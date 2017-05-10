@@ -54,3 +54,40 @@ select max(IdEntityForm) from #entityform_temp where IdEntityForm is not null
 begin tran r
 commit tran r
 rollback tran r
+
+--all update
+
+update tab set id = 1 -- проверить таблицу и поле id
+
+update tab set id = 1 -- 
+from tab
+
+
+update tab set id = 1 -- предложить поставить алиас
+from tab t join tab1 t1 on t.id=t1.id
+
+update tab set id = 1
+from tab
+where id <> 1
+
+update tab set id = 1 -- предложить использовать алиас
+from tab t
+where id <> 1
+
+update tab set id = 1
+from tab t
+where t.id <> 1
+
+update t set id = 1
+from tab t
+where t.id <> 1
+
+update t set id = 1        --ошибка, поле не было выбрано
+from (select n from tab) t 
+where rr.id <> 1 -- не верный алиас 
+
+with s as(
+	select n from tab
+	where id <> 1
+	)
+update s set n = 1
