@@ -8,7 +8,7 @@ using CommandLine.Text;
 
 namespace SqlRun
 {
-    class Options
+    public class Options
     {
         //[Option('r', "read", Required = false, HelpText = "Input file to be processed.")]
         //public string InputFile { get; set; }

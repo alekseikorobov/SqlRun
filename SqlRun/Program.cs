@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -28,7 +28,6 @@ namespace SqlRun
                     if(res != "y")
                         return;
                 }
-
                 if (Parser.Default.ParseArguments(args, options))
                 {
                     options.Verbose = true;
@@ -36,7 +35,6 @@ namespace SqlRun
                 if (!string.IsNullOrEmpty(options.Path))
                 {
                     options.Path = options.Path.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                    //char lastChar = options.Path[options.Path.Length - 1];
                     if (File.Exists(options.Path))
                     {
                         IsDirectory = false;
