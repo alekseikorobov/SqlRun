@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlRun", "SqlRun\SqlRun.csproj", "{E11CD795-8CD8-4028-9454-FA4690176327}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlCheck", "SqlCheck\SqlCheck.csproj", "{68208450-B352-438D-A9DE-D08795D93F37}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{E11CD795-8CD8-4028-9454-FA4690176327}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E11CD795-8CD8-4028-9454-FA4690176327}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E11CD795-8CD8-4028-9454-FA4690176327}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68208450-B352-438D-A9DE-D08795D93F37}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68208450-B352-438D-A9DE-D08795D93F37}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68208450-B352-438D-A9DE-D08795D93F37}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68208450-B352-438D-A9DE-D08795D93F37}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

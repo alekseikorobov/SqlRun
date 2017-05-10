@@ -84,41 +84,12 @@ namespace SqlRun
         public void InitConection()
         {
             //System.Diagnostics.Debugger.Launch();
-            var connectionString = "";
-            if (ConfigurationManager.ConnectionStrings != null
-                && ConfigurationManager.ConnectionStrings.Count > 0
-                && ConfigurationManager.ConnectionStrings["Default"] != null)
-                connectionString = ConfigurationManager.ConnectionStrings["Default"].ConnectionString;
-
-            if (string.IsNullOrEmpty(connectionString))
-            {
-                if (!string.IsNullOrEmpty(options.DataBase) && !string.IsNullOrEmpty(options.Source))
-                {
-                    connectionString = $"data source={options.Source};initial catalog={options.DataBase};integrated security=True;application name={options.DataBase};MultipleActiveResultSets=True";
-                }
-                else
-                {
-                    throw new Exception("Не указано подключение, ни в конфиге ни в параметрах");
-                }
-            }
-            else
-            {
-                if (!string.IsNullOrEmpty(options.DataBase))
-                {
-                    connectionString = Regex.Replace(connectionString, @"initial catalog\=(.*?);", $"initial catalog={options.DataBase};");
-                    connectionString = Regex.Replace(connectionString, @"application name\=(.*?);", $"initial catalog={options.DataBase};");
-                }
-                if (!string.IsNullOrEmpty(options.Source))
-                {
-                    connectionString = Regex.Replace(connectionString, @"data source\=(.*?);", $"data source={options.Source};");
-                }
-            }
-            Console.WriteLine("connectionString - {0}", connectionString);
             
+
 
             //Context = new DbContext(connectionString);
 
-            SqlConnection conn = new SqlConnection(connectionString);
+            SqlConnection conn = new SqlConnection(options.ConnectionString);
             server = new SqlCommand();
             server.Connection = conn;
             conn.Open();

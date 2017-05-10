@@ -4,28 +4,34 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using CommandLine;
 using System.Data.SqlClient;
+using SqlCheck.Modele;
 
 namespace SqlRun
 {
     class Program
     {
-		static SqlProvider SqlProvider; 
-        
+        static SqlProvider SqlProvider;
+
         static Options options;
         private static bool isStop = false;
 
         static void Main(string[] args)
         {
+            args = new string[3];
+            args[0] = "-t";
+            args[1] = "-p";
+            args[2] = @"e:\MyProject\Code\sqlparser\sqlparser\script.sql";
             bool IsDirectory = true;
             bool IsFromFile = false;
             try
             {
                 options = new Options();
-                if(args.Length == 0) { 
+                if (args.Length == 0)
+                {
                     Console.WriteLine(options.GetUsage());
                     Console.Write("Run sql with param to default? (y/n): ");
                     string res = Console.ReadLine();
-                    if(res != "y")
+                    if (res != "y")
                         return;
                 }
                 if (Parser.Default.ParseArguments(args, options))
@@ -48,11 +54,13 @@ namespace SqlRun
                         else
                         {
                             int index = options.Path.LastIndexOf(Path.AltDirectorySeparatorChar);
-                            if (index != -1) {
+                            if (index != -1)
+                            {
                                 options.Patern = options.Path.Substring(index);
                                 options.Path = options.Path.Substring(0, index);
                             }
-                            else {
+                            else
+                            {
                                 options.Patern = "*";
                             }
                         }
@@ -67,11 +75,13 @@ namespace SqlRun
                     options.Path = Environment.CurrentDirectory;
                     options.Patern = "*.sql";
                 }
-
                 //test(args); return;
 
-				SqlProvider = new SqlProvider(options);
-				SqlProvider.InitConection ();
+                if (!options.IsTest)
+                {
+                    SqlProvider = new SqlProvider(options);
+                    SqlProvider.InitConection();
+                }
 
                 if (IsFromFile)
                 {
@@ -81,7 +91,7 @@ namespace SqlRun
                         if (File.Exists(path))
                         {
                             Console.ResetColor();
-                            ActionFile(path);                           
+                            ActionFile(path);
                         }
                         else
                         {
@@ -93,7 +103,8 @@ namespace SqlRun
                             else
                             {
                                 int index = path.LastIndexOf(Path.AltDirectorySeparatorChar);
-                                if (index != -1) { 
+                                if (index != -1)
+                                {
                                     Patern = path.Substring(index);
                                     path = CleanFileName(path.Substring(0, index));
                                 }
@@ -150,10 +161,10 @@ namespace SqlRun
                 Console.WriteLine(e.Message);
                 Console.WriteLine(e.StackTrace);
                 Console.ResetColor();
-                isStop = true;                
+                isStop = true;
             }
             Console.WriteLine("end");
-            if(isStop) Console.Read();
+            if (isStop) Console.Read();
         }
 
         private static string CleanFileName(string fileName)
@@ -178,14 +189,46 @@ namespace SqlRun
             Console.WriteLine("Verbose - {0}", options.Verbose);
 
             Console.WriteLine("-----------------------------");
-        }        
+        }
 
         private static void ActionFile(string file)
         {
             try
             {
                 Console.WriteLine("file - {0}", Path.GetFileNameWithoutExtension(file));
-                SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
+
+                if (options.IsTest)
+                {
+                    SqlCheck.Parser p = new SqlCheck.Parser(options.ConnectionString);
+
+                    var messages = p.ParserFile(file);
+
+                    foreach (var message in messages.OrderBy(c => c.StartLine))
+                    {
+                        switch (message.Text.Type)
+                        {
+                            case TypeMessage.Warning:
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                break;
+                            case TypeMessage.Error:
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                break;
+                            case TypeMessage.Debug:
+                                Console.ForegroundColor = ConsoleColor.Gray;
+                                break;
+                            default:
+                                break;
+                        }
+                        Console.WriteLine(message.MessageInformation);
+                        Console.ResetColor();
+                    }
+                    if(messages.Any())
+                        Console.ReadLine();
+                }
+                else
+                {
+                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
+                }
             }
             catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file} "); }
             catch (SqlException ex) { throw new Exception($"SqlException:{ex.Message} {file} LineNumber:{ex.LineNumber}"); }
@@ -193,6 +236,6 @@ namespace SqlRun
             catch (InvalidOperationException ex) { throw new Exception($"InvalidOperationException:{ex.Message} {file} "); }
             catch (Exception ex) { throw new Exception($"Exception:{ex.Message} {file} "); }
             Console.ResetColor();
-        }       
+        }
     }
 }
