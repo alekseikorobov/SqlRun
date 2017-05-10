@@ -113,8 +113,35 @@ namespace SqlCheck
         Dictionary<string, ReferCount<DeclareTableVariableBody, int>> tableVarible
             = new Dictionary<string, ReferCount<DeclareTableVariableBody, int>>();
 
-        Dictionary<string, ReferCount<TableReference, int>> tables
-            = new Dictionary<string, ReferCount<TableReference, int>>();
+        Dictionary<string, ReferCount<TableReference, int>> tables = new Dictionary<string, ReferCount<TableReference, int>>();
+
+        List<string> AlterTables = new List<string>();
+
+        internal void getAlterTableAddTableElementStatement(AlterTableAddTableElementStatement alterTableAddTableElementStatement)
+        {
+            if(!AlterTables.Any(c=>string.Compare(c, alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value,true) == 0))
+            {
+                AlterTables.Add(alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value);
+            }
+        }
+
+        internal void getUpdateStatement(UpdateStatement updateStatement)
+        {
+            if(updateStatement.UpdateSpecification.Target is NamedTableReference)
+            {
+                var target = updateStatement.UpdateSpecification.Target as NamedTableReference;
+
+                if(updateStatement.UpdateSpecification.FromClause != null)
+                {
+
+                }
+
+                if (AlterTables.Any(c => string.Compare(c, target.SchemaObject.BaseIdentifier.Value, true) == 0))
+                {
+                    messages.addMessage(Code.T0000046, updateStatement, target.SchemaObject.BaseIdentifier.Value);
+                }
+            }
+        }
 
         Dictionary<string, ReferCount<CommonTableExpression, int>> withTables
             = new Dictionary<string, ReferCount<CommonTableExpression, int>>();
@@ -132,6 +159,7 @@ namespace SqlCheck
         }
         internal void clearObjectFromBatche()
         {
+            AlterTables.Clear();
             varible.Clear();
             tableVarible.Clear();
         }
@@ -372,50 +400,59 @@ namespace SqlCheck
             if (statement.InsertSpecification.InsertSource is SelectInsertSource)
             {
                 var select = statement.InsertSpecification.InsertSource as SelectInsertSource;
-                var query = select.Select as QuerySpecification;
-                if (query.SelectElements.Count > statement.InsertSpecification.Columns.Count)
+                if (select.Select is QuerySpecification)
                 {
-                    messages.addMessage(Code.T0000009, statement, target);
+                    var query = select.Select as QuerySpecification;
+                    if (query.SelectElements.Count > statement.InsertSpecification.Columns.Count)
+                    {
+                        messages.addMessage(Code.T0000009, statement, target);
+                    }
+                    else
+                    if (query.SelectElements.Count < statement.InsertSpecification.Columns.Count)
+                    {
+                        messages.addMessage(Code.T0000010, statement, target);
+                    }
+                    getQuerySpecification(query);
+
+                    isTargetValidate = isTargetValidate && columns.Count > 0;
+                    for (int i = 0; i < query.SelectElements.Count; i++)
+                    {
+                        var element = query.SelectElements[i];
+                        if (isTargetValidate)
+                        {
+                            var column = columns[i];
+                        }
+                        if (element is SelectScalarExpression)
+                        {
+                            var expression = (element as SelectScalarExpression).Expression;
+                            if (expression is Literal)
+                            {
+
+                            }
+                            if (expression is ColumnReferenceExpression)
+                            {
+
+                            }
+                            if (expression is VariableReference)
+                            {
+
+                            }
+                            if (expression is ScalarSubquery)
+                            {
+                                getScalarSubquery(expression as ScalarSubquery);
+                            }
+                        }
+                        if (element is SelectStarExpression)
+                        {
+                            messages.addMessage(Code.T0000008, element, target);
+                        }
+                    }
                 }
-                else
-                if (query.SelectElements.Count < statement.InsertSpecification.Columns.Count)
+                if(select.Select is BinaryQueryExpression)
                 {
-                    messages.addMessage(Code.T0000010, statement, target);
-                }
-                getQuerySpecification(query);
+                    var query = select.Select as BinaryQueryExpression;
+                    //recurse
 
-                isTargetValidate = isTargetValidate && columns.Count > 0;
-                for (int i = 0; i < query.SelectElements.Count; i++)
-                {
-                    var element = query.SelectElements[i];
-                    if (isTargetValidate)
-                    {
-                        var column = columns[i];
-                    }
-                    if (element is SelectScalarExpression)
-                    {
-                        var expression = (element as SelectScalarExpression).Expression;
-                        if (expression is Literal)
-                        {
-
-                        }
-                        if (expression is ColumnReferenceExpression)
-                        {
-
-                        }
-                        if (expression is VariableReference)
-                        {
-
-                        }
-                        if (expression is ScalarSubquery)
-                        {
-                            getScalarSubquery(expression as ScalarSubquery);
-                        }
-                    }
-                    if (element is SelectStarExpression)
-                    {
-                        messages.addMessage(Code.T0000008, element, target);
-                    }
                 }
             }
         }

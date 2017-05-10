@@ -130,7 +130,16 @@ namespace SqlCheck
             foreach (var statement in statements)
             {
                 if (statement == null) continue;
-
+                if(statement is AlterTableAddTableElementStatement)
+                {
+                    chekable.getAlterTableAddTableElementStatement(statement as AlterTableAddTableElementStatement);
+                }
+                else
+                if(statement is UpdateStatement)
+                {
+                    chekable.getUpdateStatement(statement as UpdateStatement);
+                }
+                else
                 if (statement is CreateTableStatement)
                 {
                     chekable.getCreateTableStatement(statement as CreateTableStatement);

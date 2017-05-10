@@ -13,14 +13,17 @@ namespace SqlRun
         static SqlProvider SqlProvider;
 
         static Options options;
+        static SqlCheck.Parser parser;
         private static bool isStop = false;
 
         static void Main(string[] args)
         {
-            args = new string[3];
-            args[0] = "-t";
-            args[1] = "-p";
-            args[2] = @"e:\MyProject\Code\sqlparser\sqlparser\script.sql";
+            args = new[]
+            {
+                "-t",
+                "-p",
+                @"script.sql"
+            };
             bool IsDirectory = true;
             bool IsFromFile = false;
             try
@@ -76,6 +79,8 @@ namespace SqlRun
                     options.Patern = "*.sql";
                 }
                 //test(args); return;
+
+                parser = new SqlCheck.Parser(options.ConnectionString);
 
                 if (!options.IsTest)
                 {
@@ -199,11 +204,9 @@ namespace SqlRun
 
                 if (options.IsTest)
                 {
-                    SqlCheck.Parser p = new SqlCheck.Parser(options.ConnectionString);
+                    var messages = parser.ParserFile(file);
 
-                    var messages = p.ParserFile(file);
-
-                    foreach (var message in messages.OrderBy(c => c.StartLine))
+                    foreach (var message in messages.Where(c=>c.Text.IsDesable) .OrderBy(c => c.StartLine))
                     {
                         switch (message.Text.Type)
                         {
@@ -222,19 +225,21 @@ namespace SqlRun
                         Console.WriteLine(message.MessageInformation);
                         Console.ResetColor();
                     }
-                    if(messages.Any())
-                        Console.ReadLine();
+                    if (messages.Any())
+                    {
+                        isStop = true;
+                    }                        
                 }
                 else
                 {
                     SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
                 }
             }
-            catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file} "); }
-            catch (SqlException ex) { throw new Exception($"SqlException:{ex.Message} {file} LineNumber:{ex.LineNumber}"); }
-            catch (IOException ex) { throw new Exception($"IOException:{ex.Message} {file} "); }
-            catch (InvalidOperationException ex) { throw new Exception($"InvalidOperationException:{ex.Message} {file} "); }
-            catch (Exception ex) { throw new Exception($"Exception:{ex.Message} {file} "); }
+            catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }
+            catch (SqlException ex) { throw new Exception($"SqlException:{ex.Message} {file} LineNumber:{ex.LineNumber}; StackTrace {ex.StackTrace}"); }
+            catch (IOException ex) { throw new Exception($"IOException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }
+            catch (InvalidOperationException ex) { throw new Exception($"InvalidOperationException:{ex.Message} {file}; StackTrace {ex.StackTrace}"); }
+            catch (Exception ex) { throw new Exception($"Exception:{ex.Message} {file}; StackTrace {ex.StackTrace}"); }
             Console.ResetColor();
         }
     }

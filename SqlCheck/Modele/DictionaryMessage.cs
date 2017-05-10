@@ -52,7 +52,8 @@ namespace SqlCheck.Modele
         T0000042,
         T0000043,
         T0000044,
-        T0000045
+        T0000045,
+        T0000046
     }
     public enum TypeMessage
     {
@@ -62,17 +63,26 @@ namespace SqlCheck.Modele
     }
     public class MyTyps
     {
-        public MyTyps(string message) : this(message, TypeMessage.Warning)
+        public MyTyps(string message) : this(message, TypeMessage.Warning,true)
         {
 
         }
-        public MyTyps(string message, TypeMessage type)
+        public MyTyps(string message, TypeMessage type) : this(message, type, true)
+        {
+
+        }
+        public MyTyps(string message, bool isDesable) : this(message, TypeMessage.Warning, isDesable)
+        {
+        }
+        public MyTyps(string message, TypeMessage type, bool isDesable)
         {
             Message = message;
             Type = type;
+            IsDesable = isDesable;
         }
         public string Message { get; set; }
         public TypeMessage Type { get; set; }
+        public bool IsDesable { get; set; }
     }
     public static class DictionaryMessage
     {
@@ -118,11 +128,12 @@ namespace SqlCheck.Modele
             , { Code.T0000038,new MyTyps("Табличная переменная {0} уже объявлена")}
             , { Code.T0000039,new MyTyps("Временная таблица {0} уже была создана")}
             , { Code.T0000040,new MyTyps("Таблица {0} создается повторно")}
-            , { Code.T0000041,new MyTyps("Перед созданием новой таблицы {0} отсутствует удаление")}
+            , { Code.T0000041,new MyTyps("Перед созданием новой таблицы {0} отсутствует удаление",false)}
             , { Code.T0000042,new MyTyps("Все параметры для функции object_id должны быть текстовыми")}
             , { Code.T0000043,new MyTyps("Не удалось получить идентификатор из функции object_id параметра - '{0}' ")}
-            , { Code.T0000044,new MyTyps("При удалении объекта '{0}' отсутствует проверка на существование ")}
+            , { Code.T0000044,new MyTyps("При удалении объекта '{0}' отсутствует проверка на существование ",false)}
             , { Code.T0000045,new MyTyps("Параметр '{0}' нигде не используется")}
+            , { Code.T0000046,new MyTyps("После Alter table '{0}' для Update следует разделить на Batch")}
 
         };
         public static MyTyps GetMessage(Code Code)
