@@ -34,12 +34,33 @@
 
 ---Задачи:
 --сказать что должен быть GO
-alter table #ttt add FirmID int
-update t set FirmID = f.ID
-from #ttt t left join Firm f on t.Code2 = f.Code
+--alter table #ttt add FirmID int
+--update t set FirmID = f.ID
+--from #ttt t left join Firm f on t.Code2 = f.Code
 
----ошибки 41 44 не работают на примере:
-if OBJECT_ID('[Import].[Mars_EngagementDepStage]') is not null drop table [Import].[Mars_EngagementDepStage];
+---ошибки 41 44 не работают напримере:
+
+--if OBJECT_ID('[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
+--if OBJECT_ID('[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+--if OBJECT_ID('[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+--if OBJECT_ID('[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+
+if OBJECT_ID('kdb.dbo.Mars_EngagementDepStage') is not null drop table [Mars_EngagementDepStage];
+if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+
+if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
+if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+
+if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
+if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+
+
 go
 CREATE TABLE [Import].[Mars_EngagementDepStage](
 	[EngagementCode] [nvarchar](50) NOT NULL,
@@ -61,7 +82,6 @@ update tab set id = 1 -- проверить таблицу и поле id
 
 update tab set id = 1 -- 
 from tab
-
 
 update tab set id = 1 -- предложить поставить алиас
 from tab t join tab1 t1 on t.id=t1.id

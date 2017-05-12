@@ -119,7 +119,7 @@ namespace SqlCheck
 
         internal void getAlterTableAddTableElementStatement(AlterTableAddTableElementStatement alterTableAddTableElementStatement)
         {
-            if(!AlterTables.Any(c=>string.Compare(c, alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value,true) == 0))
+            if (!AlterTables.Any(c => string.Compare(c, alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value, true) == 0))
             {
                 AlterTables.Add(alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value);
             }
@@ -127,11 +127,11 @@ namespace SqlCheck
 
         internal void getUpdateStatement(UpdateStatement updateStatement)
         {
-            if(updateStatement.UpdateSpecification.Target is NamedTableReference)
+            if (updateStatement.UpdateSpecification.Target is NamedTableReference)
             {
                 var target = updateStatement.UpdateSpecification.Target as NamedTableReference;
 
-                if(updateStatement.UpdateSpecification.FromClause != null)
+                if (updateStatement.UpdateSpecification.FromClause != null)
                 {
 
                 }
@@ -448,7 +448,7 @@ namespace SqlCheck
                         }
                     }
                 }
-                if(select.Select is BinaryQueryExpression)
+                if (select.Select is BinaryQueryExpression)
                 {
                     var query = select.Select as BinaryQueryExpression;
                     //recurse
@@ -904,17 +904,30 @@ namespace SqlCheck
         }
         string getBaseIdentifier(string str)
         {
-            string res = "";
+            //return str.Replace("[", "").Replace("]", "");
+
             if (!str.Contains('.'))
             {
-                res = str.Replace("[", "").Replace("]", "");
+                getFullObject(null,null,str);
+                //res = str.Replace("[", "").Replace("]", "");
             }
             else
             {
-                var r = str.Split(new[] { "].[", ".[", "].", "." }, StringSplitOptions.None);
-                if (r.Length > 0)
+                string[] res;
+                if (str.Contains('[') && str.Contains(']'))
                 {
-                    res = r[r.Length - 1].Replace("[", "").Replace("]", "");
+                    res = str.Split(new[] { "].[", ".[", "]." }, StringSplitOptions.None);                    
+                }
+                else
+                {
+                    res = str.Split(new[] { "." }, StringSplitOptions.None);                    
+                }
+                if (res.Length > 0)
+                {
+                    getFullObject(
+                         res.Length>2?r[res.Length-3]:null
+                        ,res.Length>1?r[res.Length-2]:null
+                        ,res.Length>0?r[res.Length-1]:null)
                 }
             }
             return res;
@@ -1072,8 +1085,23 @@ namespace SqlCheck
             throw new NotImplementedException();
         }
 
+        string getFullObject(string Database,string Schema, string Base)
+        {
+            string res = "";
+            res += Database == null ? (string.IsNullOrEmpty(database) ? "" : database + ".") : Database + ".";
+            res += Schema == null ? "dbo." : Schema + ".";
+            res += Base;
+            return res;
+        }
+
         private string getNameIdentifiers(MultiPartIdentifier multiPart)
         {
+            if (multiPart is SchemaObjectName)
+            {
+                var obj = multiPart as SchemaObjectName;                
+                return getFullObject(obj.DatabaseIdentifier?.Value, obj.SchemaIdentifier?.Value, obj.BaseIdentifier.Value);
+            }
+
             return string.Join(".", multiPart.Identifiers.Select(c => c.Value));
         }
         private string getNameTable(TableReference table)
@@ -1103,8 +1131,6 @@ namespace SqlCheck
             }
             return null;
         }
-
-
 
 
         void AddTable(TableReference tableReference)

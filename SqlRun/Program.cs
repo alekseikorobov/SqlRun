@@ -79,8 +79,8 @@ namespace SqlRun
                     options.Patern = "*.sql";
                 }
                 //test(args); return;
-
-                parser = new SqlCheck.Parser(options.ConnectionString);
+                                
+                parser = new SqlCheck.Parser(); //options.ConnectionString
 
                 if (!options.IsTest)
                 {

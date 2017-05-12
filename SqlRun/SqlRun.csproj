@@ -71,9 +71,9 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>mkdir "$(TargetDir)Output"
-"$(SolutionDir)\packages\ILMerge.2.14.1208\tools\ILMerge.exe" /wildcards /out:"$(TargetDir)Output\$(TargetFileName)" "$(TargetPath)" "$(TargetDir)*.dll"  /closed
-COPY "$(TargetPath).config" "$(TargetDir)Output\$(TargetFileName).config"
+    <PostBuildEvent>::mkdir "$(TargetDir)Output"
+::"$(SolutionDir)\packages\ILMerge.2.14.1208\tools\ILMerge.exe" /wildcards /out:"$(TargetDir)Output\$(TargetFileName)" "$(TargetPath)" "$(TargetDir)*.dll"  /closed
+::COPY "$(TargetPath).config" "$(TargetDir)Output\$(TargetFileName).config"
 ::replace name provider</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
