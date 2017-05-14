@@ -1,6 +1,20 @@
-﻿create table mytable(id int)
-Go 
-insert mytable(id) values(1)
+﻿--select t.id,t.name from (select id,name from tabl) t1
+
+select t1.id,t.name 
+from (select id,n as name,tab=n1 from t) t1
+
+--select t2.id,t2.name 
+--from (
+--	select t1.id,t1.name
+--	from (select id,n as name,tab=n1 from t) t1
+--	) t2
+
+--with t1 as(select id,name from tabl) select t.id,t.name from t1
+
+
+--create table mytable(id int)
+--Go 
+--insert mytable(id) values(1)
 
 --create table #table(id int)
 

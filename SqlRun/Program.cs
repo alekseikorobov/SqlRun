@@ -225,12 +225,19 @@ namespace SqlRun
                 }
                 if (!options.IsTest)
                 {
+                    Console.WriteLine("Продолжить?");
                     if (messages.Any())
                     {
-                        Console.WriteLine("Продолжить?");
                         Console.ReadLine();
                     }
                     SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
+                }
+                else
+                {
+                    if (messages.Any())
+                    {
+                        Console.ReadLine();
+                    }
                 }
             }
             catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }

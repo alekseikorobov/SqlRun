@@ -178,7 +178,7 @@ namespace SqlCheck
                         {
                             ///текущую колонку мы можем проверить, только при условии получили структуру таблицы
                             ///иначе мы можем проверить только чем обновляем
-                            var column = (set as AssignmentSetClause).Column; 
+                            var column = (set as AssignmentSetClause).Column;
                             if (column is ColumnReferenceExpression)
                             {
                                 var myColumn = table.getColumn(column);
@@ -412,7 +412,7 @@ namespace SqlCheck
             {
                 foreach (var item in select.WithCtesAndXmlNamespaces.CommonTableExpressions)
                 {
-                    GetQuerySpecification(item.QueryExpression as QuerySpecification, false);
+                    GetQuerySpecification(item.QueryExpression as QuerySpecification, IsAddTableList: false);
                     addWithTable(item);
                 }
             }
@@ -596,9 +596,12 @@ namespace SqlCheck
             }
             if (tableReference is QueryDerivedTable)
             {
-                //проверить результат
                 var query = tableReference as QueryDerivedTable;
-                GetQuerySpecification(query.QueryExpression as QuerySpecification);
+                lastderivedTable = query.Alias.Value;
+                derivedTables.Push(new List<MyTable>() { new MyTable(lastderivedTable) });
+                ///пока не понятно когда очищать этот список
+
+                GetQuerySpecification(query.QueryExpression as QuerySpecification, derivedTables.Peek());
             }
         }
         CreateTableStatement GetTempTable(MultiPartIdentifier dif)
@@ -735,6 +738,8 @@ namespace SqlCheck
         MyColumn getMyColumn(string alias, string columnName,TSqlFragment fragment)
         {
             MyColumn column = null;
+            column = getColumnFromDerivedTable(alias, columnName, fragment);
+            if (column != null) return column;
             if (alias != null)
             {
                 var table = getTableFromAlias(alias, fragment);
@@ -754,12 +759,14 @@ namespace SqlCheck
             else
             {
                 List<MyColumn> cols = new List<MyColumn>();
+                bool IsSendMessage = false;
                 foreach (var table in tables)
                 {
                     var myTable = GetMyTable(table.Value.Obj, true);
 
                     if (myTable != null && myTable.IsExists)
                     {
+                        IsSendMessage = true;
                         MyColumn myColumn = myTable.getColumn(columnName);
                         if (myColumn != null)
                             cols.Add(myColumn);
@@ -776,7 +783,45 @@ namespace SqlCheck
                 {
                     messages.addMessage(Code.T0000033, fragment, columnName);
                 }
-                if (cols.Count == 0)
+                if (IsSendMessage && cols.Count == 0)
+                    messages.addMessage(Code.T0000030, fragment, columnName);
+            }
+            return column;
+        }
+
+        private MyColumn getColumnFromDerivedTable(string alias, string columnName, TSqlFragment fragment)
+        {
+            MyColumn column = null;
+            var derTables = derivedTables.Peek();
+            if (alias != null)
+            {
+                var table = derTables.SingleOrDefault(c => c.Name == alias);
+                if(table != null)
+                    return table.getColumn(columnName);
+            }
+            else
+            {
+                List<MyColumn> cols = new List<MyColumn>();
+                bool IsSendMessage = false;
+                foreach (var table in derTables)
+                {
+                    MyColumn myColumn = table.getColumn(columnName);
+                    if (myColumn != null)
+                        cols.Add(myColumn);
+
+                    if (cols.Count > 1)
+                        break;
+
+                }
+                if (cols.Count == 1)
+                {
+                    column = cols[0];
+                }
+                if (cols.Count > 1)
+                {
+                    messages.addMessage(Code.T0000033, fragment, columnName);
+                }
+                if (IsSendMessage && cols.Count == 0)
                     messages.addMessage(Code.T0000030, fragment, columnName);
             }
             return column;
@@ -806,6 +851,8 @@ namespace SqlCheck
             }
             return column;
         }
+        Stack<List<MyTable>> derivedTables = new Stack<List<MyTable>>();
+        string lastderivedTable = "";
         bool findColumnFromLocalTemp(MyColumn myColumn)
         {
             foreach (var table in createTebles)
@@ -836,7 +883,7 @@ namespace SqlCheck
             }
         }
         #endregion
-        void GetQuerySpecification(QuerySpecification Query, bool IsAddTableList = true)
+        void GetQuerySpecification(QuerySpecification Query, List<MyTable> myTableList = null, bool IsAddTableList = true)
         {
             if (Query.FromClause != null)
             {
@@ -858,6 +905,15 @@ namespace SqlCheck
                     if (expression.Expression is ColumnReferenceExpression)
                     {
                         var myColumn = checkedColumnReference(expression.Expression as ColumnReferenceExpression);
+                        if (myTableList != null)
+                        {
+                            var lastTable = myTableList.Single(c => c.Name == lastderivedTable);
+                            if (expression.ColumnName != null)
+                            {
+                                myColumn.Name = expression.ColumnName.Value;
+                            }
+                            lastTable.AddColumns(myColumn);
+                        }
                     }
                     if (expression.Expression is FunctionCall)
                     {

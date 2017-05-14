@@ -38,7 +38,6 @@ namespace SqlCheck
                     this.IsNullable = nul.Nullable;
                 }
             }
-            //this.col = col;
         }
 
         public string FullName

@@ -56,5 +56,9 @@ namespace SqlCheck
             var dif = column.MultiPartIdentifier.Identifiers;
             return getColumn(dif[dif.Count - 1]?.Value);
         }
+        public void AddColumns(MyColumn myColumn)
+        {
+            Columns.Add(myColumn);
+        }
     }
 }
