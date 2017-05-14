@@ -1,4 +1,6 @@
-﻿--create table mytable(id int)
+﻿create table mytable(id int)
+Go 
+insert mytable(id) values(1)
 
 --create table #table(id int)
 
@@ -45,69 +47,84 @@
 --if OBJECT_ID('[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
 --if OBJECT_ID('[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
 
-if OBJECT_ID('kdb.dbo.Mars_EngagementDepStage') is not null drop table [Mars_EngagementDepStage];
-if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
-if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
-if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+--use [kdb];
+--if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
+--if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+--if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+--if OBJECT_ID('[dbo].[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
 
-if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
-if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
-if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
-if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb]..[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
 
-if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
-if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
-if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
-if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [dbo].[Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [kdb]..[Mars_EngagementDepStage];
+--if OBJECT_ID('[kdb].dbo.[Mars_EngagementDepStage]') is not null drop table [kdb].[dbo].[Mars_EngagementDepStage];
 
 
-go
-CREATE TABLE [Import].[Mars_EngagementDepStage](
-	[EngagementCode] [nvarchar](50) NOT NULL,
-	[EmployeeCode] [nvarchar](50) NOT NULL,
-	[DEP] [varchar](10) NOT NULL
-) ON [PRIMARY]
+--go
+--CREATE TABLE #entityform_temp(
+--	[EngagementCode] [nvarchar](50) NOT NULL,
+--	[EmployeeCode] [nvarchar](50) NOT NULL,
+--	[DEP] [varchar](10) NOT NULL
+--) ON [PRIMARY]
 
 --не говорить о том что при скалярной выборке использовать top если используется 1 агрегатная функция:
-select max(IdEntityForm) from #entityform_temp where IdEntityForm is not null
+--select max(t.IdEntityForm) from #entityform_temp t where [DEP] is not null
 
 ---обработка транзакций
-begin tran r
-commit tran r
-rollback tran r
+--begin tran r
+--commit tran r
+--rollback tran r
 
 --all update
 
-update tab set id = 1 -- проверить таблицу и поле id
+--create table tab(id1 int)
 
-update tab set id = 1 -- 
-from tab
+--update tab set id = 1 -- проверить таблицу и поле id
 
-update tab set id = 1 -- предложить поставить алиас
-from tab t join tab1 t1 on t.id=t1.id
+--update tab set id = 1 -- не верная таблица tab1
+--from #tab t
 
-update tab set id = 1
-from tab
-where id <> 1
+--update t1 set id = 1 -- предложить поставить алиас
+--from tab t join tab1 t1 on t.id=t1.id
 
-update tab set id = 1 -- предложить использовать алиас
-from tab t
-where id <> 1
+--update tab set id = 1
+--from tab
+--where id <> 1
 
-update tab set id = 1
-from tab t
-where t.id <> 1
+--update tab set id = 1 -- предложить использовать алиас
+--from tab t
+--where id <> 1
 
-update t set id = 1
-from tab t
-where t.id <> 1
+--update tab set id = 1
+--from tab t
+--where t.id <> 1
 
-update t set id = 1        --ошибка, поле не было выбрано
-from (select n from tab) t 
-where rr.id <> 1 -- не верный алиас 
+--update t set id = 1
+--from tab t
+--where t.id <> 1
 
-with s as(
-	select n from tab
-	where id <> 1
-	)
-update s set n = 1
+--update t set id = 1        --ошибка, поле не было выбрано
+--from (select n from tab) t 
+--where rr.id <> 1 -- не верный алиас 
+
+--with s as(
+--	select n from tab
+--	where id <> 1
+--	)
+--update s set n = 1
+
+--update t set id = t2.id
+--from tab t join tab1 t1 on t.id = t1.id
+--where t.id <> 1
+
+
+
+
+
+
+
+

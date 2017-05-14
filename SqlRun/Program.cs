@@ -79,7 +79,7 @@ namespace SqlRun
                     options.Patern = "*.sql";
                 }
                 //test(args); return;
-                                
+
                 parser = new SqlCheck.Parser(); //options.ConnectionString
 
                 if (!options.IsTest)
@@ -202,36 +202,34 @@ namespace SqlRun
             {
                 Console.WriteLine("file - {0}", Path.GetFileNameWithoutExtension(file));
 
-                if (options.IsTest)
-                {
-                    var messages = parser.ParserFile(file);
+                var messages = parser.ParserFile(file);
 
-                    foreach (var message in messages.Where(c=>c.Text.IsDesable) .OrderBy(c => c.StartLine))
+                foreach (var message in messages.Where(c => c.Text.IsDesable).OrderBy(c => c.StartLine))
+                {
+                    switch (message.Text.Type)
                     {
-                        switch (message.Text.Type)
-                        {
-                            case TypeMessage.Warning:
-                                Console.ForegroundColor = ConsoleColor.Yellow;
-                                break;
-                            case TypeMessage.Error:
-                                Console.ForegroundColor = ConsoleColor.Red;
-                                break;
-                            case TypeMessage.Debug:
-                                Console.ForegroundColor = ConsoleColor.Gray;
-                                break;
-                            default:
-                                break;
-                        }
-                        Console.WriteLine(message.MessageInformation);
-                        Console.ResetColor();
+                        case TypeMessage.Warning:
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            break;
+                        case TypeMessage.Error:
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            break;
+                        case TypeMessage.Debug:
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                            break;
+                        default:
+                            break;
                     }
+                    Console.WriteLine(message.MessageInformation);
+                    Console.ResetColor();
+                }
+                if (!options.IsTest)
+                {
                     if (messages.Any())
                     {
-                        isStop = true;
-                    }                        
-                }
-                else
-                {
+                        Console.WriteLine("Продолжить?");
+                        Console.ReadLine();
+                    }
                     SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
                 }
             }

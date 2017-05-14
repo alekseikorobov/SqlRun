@@ -19,8 +19,32 @@ namespace SqlCheck
         string serverName = "";
         bool IsAliasAll = true;
         public Message messages = new Message();
+        Server server;
+        Dictionary<string, ReferCount<DeclareVariableElement, int>> varible
+            = new Dictionary<string, ReferCount<DeclareVariableElement, int>>();
+        Dictionary<string, ReferCount<ProcedureParameter, int>> parametrs
+            = new Dictionary<string, ReferCount<ProcedureParameter, int>>();
+        Dictionary<string, ReferCount<SchemaObjectName, int>> dropTebles
+            = new Dictionary<string, ReferCount<SchemaObjectName, int>>();
+        Dictionary<string, ReferCount<FunctionCall, int>> compareNull
+            = new Dictionary<string, ReferCount<FunctionCall, int>>();
+        Dictionary<string, ReferCount<CreateTableStatement, int>> tempTeble
+            = new Dictionary<string, ReferCount<CreateTableStatement, int>>();
+        Dictionary<string, ReferCount<CreateTableStatement, int>> createTebles
+            = new Dictionary<string, ReferCount<CreateTableStatement, int>>();
+        Dictionary<string, ReferCount<DeclareTableVariableBody, int>> tableVarible
+            = new Dictionary<string, ReferCount<DeclareTableVariableBody, int>>();
+        Dictionary<string, ReferCount<TableReference, int>> tables =
+            new Dictionary<string, ReferCount<TableReference, int>>();
+        Dictionary<string, ReferCount<CommonTableExpression, int>> withTables
+            = new Dictionary<string, ReferCount<CommonTableExpression, int>>();
+
+        List<string> AlterTables = new List<string>();
+
         MyObjectFromServer GetObjectFromServer(TSqlFragment type)
         {
+            if (!server.ConnectionContext.IsOpen) return null;
+
             if (type is NamedTableReference)
             {
                 var t = type as NamedTableReference;
@@ -31,8 +55,8 @@ namespace SqlCheck
                 }
                 var table = t.SchemaObject.BaseIdentifier.Value;
                 var schema = t.SchemaObject.SchemaIdentifier?.Value ?? this.schema;
-                database = t.SchemaObject.DatabaseIdentifier?.Value ?? database;
-                Database db = server.Databases[database];
+                var databaseNow = t.SchemaObject.DatabaseIdentifier?.Value ?? database;
+                Database db = server.Databases[databaseNow];
                 SqlSmoObject obj = db.Tables[table, schema] as SqlSmoObject ?? db.Views[table, schema] as SqlSmoObject;
                 var temptable = new MyTable();
                 if (obj != null)
@@ -41,9 +65,10 @@ namespace SqlCheck
                     {
                         var tableServer = obj as TableViewTableTypeBase;
                         temptable.Name = tableServer.ToString();
-                        foreach (Column item in tableServer.Columns)
+                        temptable.IsExists = true;
+                        foreach (Column column in tableServer.Columns)
                         {
-                            temptable.Columns.Add(new MyColumn(item));
+                            temptable.AddColumns(column);
                         }
                         TableFromServer.Add(fullNameTable, temptable);
                     }
@@ -61,9 +86,6 @@ namespace SqlCheck
             }
             return null;
         }
-
-        Server server;
-
         public Chekable()
         {
             server = new Server();
@@ -93,47 +115,99 @@ namespace SqlCheck
             }
         }
 
-        Dictionary<string, ReferCount<DeclareVariableElement, int>> varible
-            = new Dictionary<string, ReferCount<DeclareVariableElement, int>>();
-
-        Dictionary<string, ReferCount<ProcedureParameter, int>> parametrs
-            = new Dictionary<string, ReferCount<ProcedureParameter, int>>();
-
-        Dictionary<string, ReferCount<SchemaObjectName, int>> dropTebles
-            = new Dictionary<string, ReferCount<SchemaObjectName, int>>();
-
-        Dictionary<string, ReferCount<BooleanIsNullExpression, int>> compareNull
-            = new Dictionary<string, ReferCount<BooleanIsNullExpression, int>>();
-
-        Dictionary<string, ReferCount<CreateTableStatement, int>> tempTeble
-            = new Dictionary<string, ReferCount<CreateTableStatement, int>>();
-        Dictionary<string, ReferCount<CreateTableStatement, int>> createTebles
-            = new Dictionary<string, ReferCount<CreateTableStatement, int>>();
-
-        Dictionary<string, ReferCount<DeclareTableVariableBody, int>> tableVarible
-            = new Dictionary<string, ReferCount<DeclareTableVariableBody, int>>();
-
-        Dictionary<string, ReferCount<TableReference, int>> tables = new Dictionary<string, ReferCount<TableReference, int>>();
-
-        List<string> AlterTables = new List<string>();
-
-        internal void getAlterTableAddTableElementStatement(AlterTableAddTableElementStatement alterTableAddTableElementStatement)
+        #region Statements
+        public void getUseStatement(UseStatement useStatement)
+        {
+            this.database = useStatement.DatabaseName.Value;
+        }
+        public void getAlterTableAddTableElementStatement(AlterTableAddTableElementStatement alterTableAddTableElementStatement)
         {
             if (!AlterTables.Any(c => string.Compare(c, alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value, true) == 0))
             {
                 AlterTables.Add(alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value);
             }
         }
-
-        internal void getUpdateStatement(UpdateStatement updateStatement)
+        public void getUpdateStatement(UpdateStatement updateStatement)
         {
             if (updateStatement.UpdateSpecification.Target is NamedTableReference)
             {
                 var target = updateStatement.UpdateSpecification.Target as NamedTableReference;
 
+                MyTable table = null;
                 if (updateStatement.UpdateSpecification.FromClause != null)
                 {
+                    foreach (var tableReference in updateStatement.UpdateSpecification.FromClause.TableReferences)
+                    {
+                        CheckeTableReference(tableReference);
+                    }
+                    //var table = GetMyTable(target, true);
+                    ///предположительно target должен быть alias на таблицу из FromClause
 
+                    string al = getAliasOrNameTable(target, false);
+                    var ta = getTableFromAlias(al, target, false) as NamedTableReference;
+                    if (ta == null)
+                    {
+                        ta = getTableFromAlias(target.SchemaObject.BaseIdentifier.Value, target, false) as NamedTableReference;
+                    }
+                    if (ta != null)
+                    {
+                        table = GetMyTable(ta, true);
+                    }
+                    else
+                    {
+                        messages.addMessage(Code.T0000050, target, al);
+                    }
+                }
+                else
+                {
+                    table = GetMyTable(target, true);
+                }
+
+                if (updateStatement.UpdateSpecification.WhereClause != null)
+                {
+                    //updateStatement.UpdateSpecification.WhereClause.
+                    checkedBooleanComparison(updateStatement.UpdateSpecification.WhereClause.SearchCondition);
+                }
+
+                ///checked column set
+                foreach (var set in updateStatement.UpdateSpecification.SetClauses)
+                {
+                    if (set is AssignmentSetClause)
+                    {
+                        if (table != null && table.IsExists)
+                        {
+                            ///текущую колонку мы можем проверить, только при условии получили структуру таблицы
+                            ///иначе мы можем проверить только чем обновляем
+                            var column = (set as AssignmentSetClause).Column; 
+                            if (column is ColumnReferenceExpression)
+                            {
+                                var myColumn = table.getColumn(column);
+                                if (myColumn != null)
+                                {
+                                    var newVal = (set as AssignmentSetClause).NewValue;
+                                    if (newVal is ColumnReferenceExpression)
+                                    {
+                                    }
+                                    if (newVal is Literal)
+                                    {
+                                        //сравнить типы (если возможно)
+                                    }
+                                }
+                                else
+                                {
+                                    messages.addMessage(Code.T0000049, column, getNameIdentifiers(column.MultiPartIdentifier), table.Name);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var newVal = (set as AssignmentSetClause).NewValue;
+                            if (newVal is ColumnReferenceExpression)
+                            {
+                                checkedColumnReference(newVal as ColumnReferenceExpression);
+                            }
+                        }
+                    }
                 }
 
                 if (AlterTables.Any(c => string.Compare(c, target.SchemaObject.BaseIdentifier.Value, true) == 0))
@@ -142,179 +216,28 @@ namespace SqlCheck
                 }
             }
         }
-
-        Dictionary<string, ReferCount<CommonTableExpression, int>> withTables
-            = new Dictionary<string, ReferCount<CommonTableExpression, int>>();
-
-        internal void clearObjectFromStatement()
-        {
-            IsAliasAll = true;
-            tables.Clear();
-            withTables.Clear();
-            parametrs.Clear();
-        }
-        internal void clearObjectFromFile()
-        {
-            tempTeble.Clear();
-        }
-        internal void clearObjectFromBatche()
-        {
-            AlterTables.Clear();
-            varible.Clear();
-            tableVarible.Clear();
-        }
-        public void CheckUsengTableVarible()
-        {
-            foreach (var table in tableVarible)
-            {
-                if (table.Value.Count == 0)
-                {
-                    messages.addMessage(Code.T0000011, table.Value.Obj, table.Key);
-                }
-            }
-        }
-        public void CheckUsingVariable()
-        {
-            foreach (var value in varible)
-            {
-                if (value.Value.Count == 0)
-                {
-                    messages.addMessage(Code.T0000001, value.Value.Obj, value.Value.Obj.VariableName.Value);
-                }
-            }
-        }
-        public void CheckUsingParams()
-        {
-            foreach (var parametr in parametrs)
-            {
-                if (parametr.Value.Count == 0)
-                {
-                    messages.addMessage(Code.T0000045, parametr.Value.Obj, parametr.Value.Obj.VariableName.Value);
-                }
-            }
-        }
-        private void allChecked(DeclareVariableElement var)
-        {
-            if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
-            {
-                StringLiteral stringLiteral = var.Value as StringLiteral;
-                var DataType = var.DataType as SqlDataTypeReference;
-
-                if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
-                        || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
-                    && stringLiteral != null && stringLiteral.Value != null
-                    )
-                {
-                    if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
-                    {
-                        DataType.Parameters[0].Value = "8000";
-                    }
-                    int len = int.Parse(DataType.Parameters[0].Value);
-                    if (len < stringLiteral.Value.Length)
-                    {
-                        messages.addMessage(Code.T0000002, var, var.VariableName.Value);
-                    }
-                }
-            }
-            if (var.Value is ScalarSubquery)
-            {
-                getScalarSubquery(var.Value as ScalarSubquery);
-            }
-        }
-        public void PostFileChecable()
-        {
-            ///проверка удаления временных таблиц            
-        }
-        internal void PostBatcheChecable()
-        {
-            ///проверка закрытия транзакций
-            ///проверка использвание переменных
-            ///проверка использвание аргументов
-            CheckUsingVariable();
-            CheckUsengTableVarible();
-        }
-        public void PostAllStatmentChecable()
-        {
-            CheckUsingVariable();
-            CheckUsingParams();
-        }
-        private Literal getLiteral(VariableReference variableReference)
-        {
-            var res = getDeclare(variableReference).Value;
-            if (res is Literal)
-            {
-                return res as Literal;
-            }
-            else
-            if (res is BinaryExpression)
-            {
-                res = calculateExpression(res as BinaryExpression);
-                //getBooleanBinaryExpression(res as BinaryExpression);
-            }
-            return res as Literal;
-        }
-        private DeclareVariableElement getDeclare(VariableReference variableReference)
-        {
-            if (string.IsNullOrEmpty(variableReference.Name))
-            {
-                throw new Exception(string.Format("Переменная не определена"));
-            }
-            if (varible.ContainsKey(variableReference.Name))
-            {
-                varible[variableReference.Name].Count++;
-                return varible[variableReference.Name].Obj;
-            }
-            else
-            if (parametrs.ContainsKey(variableReference.Name))
-            {
-                parametrs[variableReference.Name].Count++;
-                return parametrs[variableReference.Name].Obj;
-            }
-            messages.addMessage(Code.T0000004, variableReference, variableReference.Name);
-            return null;
-        }
-        CreateTableStatement getTemptable(string name)
-        {
-            if (!tempTeble.ContainsKey(name))
-            {
-                messages.addMessage(Code.T0000016, null, name);
-                return null;
-            }
-
-            tempTeble[name].Count++;
-            return tempTeble[name].Obj;
-        }
-        bool IsTempTable(string name)
-        {
-            return name.Length > 0 && name[0] == '#'
-                || (name.Length > 1 && name[0] == '#' && name[1] == '#');
-        }
-
-
-        #region Statements
-        internal void getCreateProcedureStatement(CreateProcedureStatement createProcedureStatement)
+        public void getCreateProcedureStatement(CreateProcedureStatement createProcedureStatement)
         {
             foreach (var param in createProcedureStatement.Parameters)
             {
                 parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
             }
         }
-        internal void getAlterProcedureStatement(AlterProcedureStatement createProcedureStatement)
+        public void getAlterProcedureStatement(AlterProcedureStatement createProcedureStatement)
         {
             foreach (var param in createProcedureStatement.Parameters)
             {
                 parametrs.Add(param.VariableName.Value, new ReferCount<ProcedureParameter, int>(param, 0));
             }
         }
-
-        internal void getDropTableStatement(DropTableStatement dropTableStatement)
+        public void getDropTableStatement(DropTableStatement dropTableStatement)
         {
             foreach (var item in dropTableStatement.Objects)
             {
                 if (item is SchemaObjectName)
                 {
                     string table = getNameIdentifiers((item as SchemaObjectName));
-                    var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table) == 0);
+                    var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table, true) == 0);
                     if (compare.Key == null)
                     {
                         messages.addMessage(Code.T0000044, dropTableStatement, table);
@@ -324,11 +247,10 @@ namespace SqlCheck
                 }
             }
         }
-
         public void getCreateTableStatement(CreateTableStatement createTableStatement)
         {
-            var ident = createTableStatement.SchemaObjectName.BaseIdentifier.Value;
-            if (IsTempTable(ident))
+            var ident = getNameIdentifiers(createTableStatement.SchemaObjectName);
+            if (IsTempTable(createTableStatement.SchemaObjectName.BaseIdentifier.Value))
             {
                 if (tempTeble.ContainsKey(ident))
                 {
@@ -381,8 +303,7 @@ namespace SqlCheck
                 target = getNameTable(Target);
                 if (!IsTempTable(target))
                 {
-                    if (server.ConnectionContext.IsOpen)
-                        table = GetObjectFromServer(Target) as MyTable;
+                    table = GetObjectFromServer(Target) as MyTable;
                 }
                 //columns = getSpecificationTableTarget(Target);
                 isTargetValidate = columns != null && columns.Count > 0;
@@ -412,7 +333,7 @@ namespace SqlCheck
                     {
                         messages.addMessage(Code.T0000010, statement, target);
                     }
-                    getQuerySpecification(query);
+                    GetQuerySpecification(query);
 
                     isTargetValidate = isTargetValidate && columns.Count > 0;
                     for (int i = 0; i < query.SelectElements.Count; i++)
@@ -439,7 +360,7 @@ namespace SqlCheck
                             }
                             if (expression is ScalarSubquery)
                             {
-                                getScalarSubquery(expression as ScalarSubquery);
+                                GetScalarSubquery(expression as ScalarSubquery);
                             }
                         }
                         if (element is SelectStarExpression)
@@ -456,8 +377,6 @@ namespace SqlCheck
                 }
             }
         }
-
-
         public void getSetVariableStatement(SetVariableStatement set)
         {
             var setResult = new SetVariableStatement();
@@ -472,7 +391,7 @@ namespace SqlCheck
 
             var.Value = setResult.Expression;
 
-            allChecked(var);
+            StringChecked(var);
         }
         public void getDeclareVariableStatement(DeclareVariableStatement dec)
         {
@@ -484,7 +403,7 @@ namespace SqlCheck
                     continue;
                 }
                 varible.Add(declar.VariableName.Value, new ReferCount<DeclareVariableElement, int>(CloneObject(declar) as DeclareVariableElement, 0));
-                allChecked(declar);
+                StringChecked(declar);
             }
         }
         public void getSelectStatement(SelectStatement select)
@@ -493,17 +412,298 @@ namespace SqlCheck
             {
                 foreach (var item in select.WithCtesAndXmlNamespaces.CommonTableExpressions)
                 {
-                    getQuerySpecification(item.QueryExpression as QuerySpecification, false);
+                    GetQuerySpecification(item.QueryExpression as QuerySpecification, false);
                     addWithTable(item);
                 }
             }
             if (select.QueryExpression != null && select.QueryExpression is QuerySpecification)
             {
-                getQuerySpecification(select.QueryExpression as QuerySpecification);
+                GetQuerySpecification(select.QueryExpression as QuerySpecification);
 
             }
         }
-        private void addWithTable(CommonTableExpression with)
+
+        //void checkedSearchCondition(BooleanExpression searchCondition)
+        //{
+        //    if (searchCondition is BooleanBinaryExpression)
+        //    {
+        //        var search = searchCondition as BooleanBinaryExpression;
+        //        checkedBooleanComparison(search);
+        //    }
+        //    if (searchCondition is BooleanComparisonExpression)
+        //    {
+        //        var search = searchCondition as BooleanComparisonExpression;
+        //        checkedBooleanComparison(search);
+        //    }
+        //}
+        #endregion
+
+        #region public
+        public void clearObjectFromStatement()
+        {
+            IsAliasAll = true;
+            tables.Clear();
+            withTables.Clear();
+            parametrs.Clear();
+            compareNull.Clear();
+            dropTebles.Clear();
+        }
+        public void clearObjectFromFile()
+        {
+            tempTeble.Clear();
+        }
+        public void clearObjectFromBatche()
+        {
+            AlterTables.Clear();
+            varible.Clear();
+            tableVarible.Clear();
+        }
+        public void CheckUsengTableVarible()
+        {
+            foreach (var table in tableVarible)
+            {
+                if (table.Value.Count == 0)
+                {
+                    messages.addMessage(Code.T0000011, table.Value.Obj, table.Key);
+                }
+            }
+        }
+        public void CheckUsingVariable()
+        {
+            foreach (var value in varible)
+            {
+                if (value.Value.Count == 0)
+                {
+                    messages.addMessage(Code.T0000001, value.Value.Obj, value.Value.Obj.VariableName.Value);
+                }
+            }
+        }
+        public void CheckUsingParams()
+        {
+            foreach (var parametr in parametrs)
+            {
+                if (parametr.Value.Count == 0)
+                {
+                    messages.addMessage(Code.T0000045, parametr.Value.Obj, parametr.Value.Obj.VariableName.Value);
+                }
+            }
+        }
+        public void PostFileChecable()
+        {
+            ///проверка удаления временных таблиц            
+            ///
+            //использование постоянной таблицы
+            //foreach (var ctable in createTebles)
+            //{
+            //    if(ctable.Value.Count == 0)
+            //    {
+            //        messages.addMessage(Code.T0000047, ctable.Value.Obj, ctable.Key);
+            //    }
+            //}
+        }
+        public void PostBatcheChecable()
+        {
+            ///проверка закрытия транзакций
+            ///проверка использвание переменных
+            ///проверка использвание аргументов
+            CheckUsingVariable();
+            CheckUsengTableVarible();
+        }
+        public void PostAllStatmentChecable()
+        {
+            CheckUsingVariable();
+            CheckUsingParams();
+        }
+        public bool checkedBooleanComparison(BooleanExpression booleanExpression)
+        {
+            if (booleanExpression is BooleanBinaryExpression)
+            {
+                bool IsFirst = checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).FirstExpression);
+                bool Second = checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).SecondExpression);
+                return IsFirst && Second;
+            }
+            if (booleanExpression is BooleanComparisonExpression)
+            {
+                return checkedBooleanComparisonExpression(booleanExpression as BooleanComparisonExpression);
+            }
+            if (booleanExpression is BooleanIsNullExpression)
+            {
+                return checkedBooleanIsNullExpression(booleanExpression as BooleanIsNullExpression);
+            }
+            if (booleanExpression is ExistsPredicate)
+            {
+                return true;
+            }
+            return true;
+        }
+        #endregion
+
+        #region Table
+
+        MyTable GetMyTable(TableReference tableReference, bool isGetColumn = false)
+        {
+            MyTable myTable = new MyTable(getNameTable(tableReference));
+
+            if (myTable.Name == null) return null;
+
+            var tableFromCreate = GetTableFromCreate(myTable.Name);
+            myTable.IsExists = tableFromCreate != null;
+            if (myTable.IsExists)
+            {
+                if (isGetColumn)
+                {
+                    foreach (var column in tableFromCreate.Definition.ColumnDefinitions)
+                    {
+                        myTable.AddColumns(column);
+                    }
+                }
+                return myTable;
+            }
+            myTable = GetObjectFromServer(tableReference) as MyTable;
+            return myTable;
+
+        }
+        void CheckeTableReference(TableReference tableReference)
+        {
+            if (tableReference is QualifiedJoin)
+            {
+                var join = tableReference as QualifiedJoin;
+                //bool IsFirst = 
+                CheckeTableReference(join.FirstTableReference);
+                //bool Second = 
+                CheckeTableReference(join.SecondTableReference);
+                //bool isCompare = 
+                checkedBooleanComparison(join.SearchCondition);
+                //return isCompare && IsFirst && Second;
+            }
+            if (tableReference is NamedTableReference)
+            {
+                //проверить результат
+                if (IsTempTable((tableReference as NamedTableReference).SchemaObject.BaseIdentifier.Value))
+                {
+                    var table = GetTempTable((tableReference as NamedTableReference).SchemaObject);
+                }
+                else
+                {
+                    ////
+                }
+                AddTable(tableReference);
+            }
+            if (tableReference is VariableTableReference)
+            {
+                //проверить результат
+                getDeclareTableVariable(tableReference as VariableTableReference);
+            }
+            if (tableReference is QueryDerivedTable)
+            {
+                //проверить результат
+                var query = tableReference as QueryDerivedTable;
+                GetQuerySpecification(query.QueryExpression as QuerySpecification);
+            }
+        }
+        CreateTableStatement GetTempTable(MultiPartIdentifier dif)
+        {
+            string name = getNameIdentifiers(dif);
+            if (!tempTeble.ContainsKey(name))
+            {
+                messages.addMessage(Code.T0000016, dif, name);
+                return null;
+            }
+
+            tempTeble[name].Count++;
+            return tempTeble[name].Obj;
+        }
+        CreateTableStatement GetTableFromCreate(string table)
+        {
+            var val = tempTeble.SingleOrDefault(c => string.Compare(table, c.Key, true) == 0);
+            if (val.Key != null)
+            {
+                val.Value.Count++;
+                return val.Value.Obj;
+            }
+            var val1 = createTebles.SingleOrDefault(c => string.Compare(table, c.Key, true) == 0);
+
+            if (val1.Key != null)
+            {
+                val1.Value.Count++;
+                return val1.Value.Obj;
+            }
+            return null;
+        }
+        TSqlFragment getTableFromAlias(string alias,TSqlFragment fragment, bool isSendMessage = true)
+        {
+            bool T = tables.ContainsKey(alias);
+            bool W = withTables.ContainsKey(alias);
+            if (!T && !W)
+            {
+                if (isSendMessage)
+                    messages.addMessage(Code.T0000014, fragment, alias);
+            }
+            else
+            if (T)
+            {
+                tables[alias].Count++;
+                return tables[alias].Obj;
+            }
+            else
+            if (W)
+            {
+                withTables[alias].Count++;
+                return withTables[alias].Obj;
+            }
+            return null;
+        }
+        void getTableServerFromAlias(string firstAlias)
+        {
+            throw new NotImplementedException();
+        }
+        DeclareTableVariableBody getDeclareTableVariable(VariableTableReference vtr)
+        {
+            if (!tableVarible.ContainsKey(vtr.Variable.Name))
+            {
+                messages.addMessage(Code.T0000015, vtr, vtr.Variable.Name);
+                return null;
+            }
+            tableVarible[vtr.Variable.Name].Count++;
+            return tableVarible[vtr.Variable.Name].Obj;
+        }
+        string getNameTable(TableReference table)
+        {
+            if (table is NamedTableReference)
+            {
+                var named = table as NamedTableReference;
+                return getNameIdentifiers(named.SchemaObject);
+            }
+            return null;
+        }
+        string getAliasTable(TableReference table)
+        {
+            if (table is NamedTableReference)
+            {
+                return (table as NamedTableReference)?.Alias?.Value;
+            }
+            if (table is VariableTableReference)
+            {
+                return (table as VariableTableReference)?.Alias?.Value;
+            }
+            if (table is QueryDerivedTable)
+            {
+                return (table as QueryDerivedTable)?.Alias?.Value;
+            }
+            return null;
+        }
+        string getAliasOrNameTable(TableReference table, bool chekedAlias = true)
+        {
+            string key = getAliasTable(table);
+            if (key == null)
+            {
+                if (chekedAlias)
+                    IsAliasAll = false;
+                key = getNameTable(table);
+            }
+            return key;
+        }
+        void addWithTable(CommonTableExpression with)
         {
             string key = with.ExpressionName.Value;
             if (withTables.ContainsKey(key))
@@ -514,8 +714,129 @@ namespace SqlCheck
 
             withTables.Add(key, new ReferCount<CommonTableExpression, int>(with, 0));
         }
+        void AddTable(TableReference tableReference)
+        {
+            string key = getAliasOrNameTable(tableReference);
+            if (tables.ContainsKey(key))
+            {
+                messages.addMessage(Code.T0000017, tableReference, key, getNameTable(tables[key].Obj));
+                return;
+            }
+            tables.Add(key, new ReferCount<TableReference, int>(tableReference, 0));
+        }
+        bool IsTempTable(string name)
+        {
+            return name.Length > 0 && name[0] == '#'
+                || (name.Length > 1 && name[0] == '#' && name[1] == '#');
+        }
+        #endregion
 
-        private void getQuerySpecification(QuerySpecification Query, bool IsAddTableList = true)
+        #region Column
+        MyColumn getMyColumn(string alias, string columnName,TSqlFragment fragment)
+        {
+            MyColumn column = null;
+            if (alias != null)
+            {
+                var table = getTableFromAlias(alias, fragment);
+                if (table is NamedTableReference)
+                {
+                    var myTable = GetMyTable(table as NamedTableReference, true);
+                    if (myTable != null && myTable.IsExists)
+                    {
+                        column = myTable.getColumn(columnName);
+                        if (column != null)
+                        {
+                            messages.addMessage(Code.T0000029, table, (table as NamedTableReference).SchemaObject.BaseIdentifier.Value, columnName);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                List<MyColumn> cols = new List<MyColumn>();
+                foreach (var table in tables)
+                {
+                    var myTable = GetMyTable(table.Value.Obj, true);
+
+                    if (myTable != null && myTable.IsExists)
+                    {
+                        MyColumn myColumn = myTable.getColumn(columnName);
+                        if (myColumn != null)
+                            cols.Add(myColumn);
+
+                        if (cols.Count > 1)
+                            break;
+                    }
+                }
+                if (cols.Count == 1)
+                {
+                    column = cols[0];
+                }
+                if (cols.Count > 1)
+                {
+                    messages.addMessage(Code.T0000033, fragment, columnName);
+                }
+                if (cols.Count == 0)
+                    messages.addMessage(Code.T0000030, fragment, columnName);
+            }
+            return column;
+        }
+        MyColumn checkedColumnReference(ColumnReferenceExpression Expression)
+        {
+            var column = new MyColumn((Column)null);
+            var Identifiers = Expression.MultiPartIdentifier.Identifiers;
+            column.Alias = Identifiers.Count > 1 ? Identifiers[Identifiers.Count - 2].Value : null;
+            column.Name = Identifiers[Identifiers.Count - 1].Value;
+
+            column.IsValid = !(Identifiers.Count > 2);
+
+            if (!column.IsValid)
+            {
+                messages.addMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
+            }
+            if (IsAliasAll && column.Alias == null)
+            {
+                messages.addMessage(Code.T0000019, Expression, column.Name);
+            }
+            //var HasColumnFromCreateTable = findColumnFromLocalTemp(column);
+            //!HasColumnFromCreateTable &&
+            if (column.IsValid)
+            {
+                column.Column = getMyColumn(column.Alias, column.Name, Expression)?.Column;
+            }
+            return column;
+        }
+        bool findColumnFromLocalTemp(MyColumn myColumn)
+        {
+            foreach (var table in createTebles)
+            {
+                foreach (var column in table.Value.Obj.Definition.ColumnDefinitions)
+                {
+                    if (string.Compare(myColumn.Name, column.ColumnIdentifier.Value, true) == 0)
+                    {
+                        //column.DataType
+                        //myColumn.Column.DataType;
+                        return true;
+                    }
+                }
+            }
+
+            //messages.addMessage
+            return false;
+        }
+        void checkColumnType(Column firstColumn, Column secondColumn)
+        {
+#warning включить проверки по типам
+            if (firstColumn != null && secondColumn != null)
+            {
+                if (firstColumn.DataType != secondColumn.DataType)
+                {
+                    messages.addMessage(new MyTyps("типы для таблиц не равны!", TypeMessage.Error), null);
+                }
+            }
+        }
+        #endregion
+        void GetQuerySpecification(QuerySpecification Query, bool IsAddTableList = true)
         {
             if (Query.FromClause != null)
             {
@@ -538,6 +859,11 @@ namespace SqlCheck
                     {
                         var myColumn = checkedColumnReference(expression.Expression as ColumnReferenceExpression);
                     }
+                    if (expression.Expression is FunctionCall)
+                    {
+                        getResultFunctionCall(expression.Expression as FunctionCall);
+
+                    }
                 }
             }
             if (Query.WhereClause != null)
@@ -545,58 +871,150 @@ namespace SqlCheck
                 checkedBooleanComparison(Query.WhereClause.SearchCondition);
             }
         }
-
-        private void CheckeTableReference(TableReference tableReference)
+        void StringChecked(DeclareVariableElement var)
         {
-            if (tableReference is QualifiedJoin)
+            if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
             {
-                var join = tableReference as QualifiedJoin;
-                CheckeTableReference(join.FirstTableReference);
-                CheckeTableReference(join.SecondTableReference);
-                //AddTable(first);
-                //AddTable(second);
-                checkedBooleanComparison(join.SearchCondition);
-            }
-            if (tableReference is NamedTableReference)
-            {
-                if (IsTempTable((tableReference as NamedTableReference).SchemaObject.BaseIdentifier.Value))
+                StringLiteral stringLiteral = var.Value as StringLiteral;
+                var DataType = var.DataType as SqlDataTypeReference;
+
+                if ((DataType.SqlDataTypeOption == SqlDataTypeOption.NVarChar
+                        || DataType.SqlDataTypeOption == SqlDataTypeOption.VarChar)
+                    && stringLiteral != null && stringLiteral.Value != null
+                    )
                 {
-                    getTemptable((tableReference as NamedTableReference).SchemaObject.BaseIdentifier.Value);
+                    if (string.Compare(DataType.Parameters[0].Value, "max", true) == 0)
+                    {
+                        DataType.Parameters[0].Value = "8000";
+                    }
+                    int len = int.Parse(DataType.Parameters[0].Value);
+                    if (len < stringLiteral.Value.Length)
+                    {
+                        messages.addMessage(Code.T0000002, var, var.VariableName.Value);
+                    }
+                }
+            }
+            if (var.Value is ScalarSubquery)
+            {
+                GetScalarSubquery(var.Value as ScalarSubquery);
+            }
+        }
+        void GetScalarSubquery(ScalarSubquery subquery)
+        {
+            if (subquery.QueryExpression is QuerySpecification)
+            {
+                var queryPart = subquery.QueryExpression as QuerySpecification;
+
+                if (queryPart.TopRowFilter != null)
+                {
+                    var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
+                    Literal literal = null;
+                    if (p.Expression is VariableReference)
+                    {
+                        literal = GetLiteral(p.Expression as VariableReference);
+                    }
+                    else
+                    if (p.Expression is IntegerLiteral)
+                    {
+                        literal = p.Expression as IntegerLiteral;
+                    }
+                    if (literal == null)
+                    {
+                        messages.addMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
+                    }
+                    else
+                    {
+                        if (int.Parse(literal.Value) != 1)
+                        {
+                            messages.addMessage(Code.T0000035, subquery, literal.Value);
+                        }
+                    }
                 }
                 else
                 {
-                    if (server.ConnectionContext.IsOpen)
-                        GetObjectFromServer(tableReference);
+                    if (queryPart.FromClause != null)
+                        messages.addMessage(Code.T0000034, subquery);
                 }
-                AddTable(tableReference as NamedTableReference);
-            }
-            if (tableReference is VariableTableReference)
-            {
-                getDeclareTableVariable(tableReference as VariableTableReference);
-            }
-            if (tableReference is QueryDerivedTable)
-            {
-                var query = tableReference as QueryDerivedTable;
-                getQuerySpecification(query.QueryExpression as QuerySpecification);
+
+                if (queryPart.WhereClause == null && queryPart.FromClause != null)
+                {
+                    messages.addMessage(Code.T0000037, subquery);
+                }
+
+                GetQuerySpecification(queryPart);
+
+                if (queryPart.SelectElements.Count > 1)
+                {
+                    messages.addMessage(Code.T0000012, subquery);
+                }
+                else
+                if (queryPart.SelectElements.Count == 1)
+                {
+                    var el = queryPart.SelectElements[0];
+                    if (el is SelectStarExpression)
+                    {
+                        messages.addMessage(Code.T0000013, subquery);
+                        return;
+                    }
+                    if (el is SelectScalarExpression)
+                    {
+                        var expression = (el as SelectScalarExpression).Expression;
+                        if (expression is Literal)
+                        {
+
+                        }
+                        if (expression is ColumnReferenceExpression)
+                        {
+
+                        }
+                        if (expression is VariableReference)
+                        {
+
+                        }
+                        if (expression is ScalarSubquery)
+                        {
+                            GetScalarSubquery(expression as ScalarSubquery);
+                        }
+                    }
+                }
             }
         }
-
-        //private void checkedSearchCondition(BooleanExpression searchCondition)
-        //{
-        //    if (searchCondition is BooleanBinaryExpression)
-        //    {
-        //        var search = searchCondition as BooleanBinaryExpression;
-        //        checkedBooleanComparison(search);
-        //    }
-        //    if (searchCondition is BooleanComparisonExpression)
-        //    {
-        //        var search = searchCondition as BooleanComparisonExpression;
-        //        checkedBooleanComparison(search);
-        //    }
-        //}
-        #endregion
-
-        private Literal calculateExpression(BinaryExpression expr)
+        Literal GetLiteral(VariableReference variableReference)
+        {
+            var res = getDeclare(variableReference).Value;
+            if (res is Literal)
+            {
+                return res as Literal;
+            }
+            else
+            if (res is BinaryExpression)
+            {
+                res = calculateExpression(res as BinaryExpression);
+                //getBooleanBinaryExpression(res as BinaryExpression);
+            }
+            return res as Literal;
+        }
+        DeclareVariableElement getDeclare(VariableReference variableReference)
+        {
+            if (string.IsNullOrEmpty(variableReference.Name))
+            {
+                throw new Exception(string.Format("Переменная не определена"));
+            }
+            if (varible.ContainsKey(variableReference.Name))
+            {
+                varible[variableReference.Name].Count++;
+                return varible[variableReference.Name].Obj;
+            }
+            else
+            if (parametrs.ContainsKey(variableReference.Name))
+            {
+                parametrs[variableReference.Name].Count++;
+                return parametrs[variableReference.Name].Obj;
+            }
+            messages.addMessage(Code.T0000004, variableReference, variableReference.Name);
+            return null;
+        }
+        Literal calculateExpression(BinaryExpression expr)
         {
             if (expr.FirstExpression is BinaryExpression)
             {
@@ -647,132 +1065,7 @@ namespace SqlCheck
             }
             return null;
         }
-        T calculate<T, T1>(BinaryExpression val, Func<string, T1> parse, Func<T1, T1, T1> result)
-             where T : Literal, new()
-        {
-            T res = new T();
-            res.Value = result(parse((val.FirstExpression as Literal).Value), parse((val.SecondExpression as Literal).Value)).ToString();
-            return res;
-        }
-        DeclareTableVariableBody getDeclareTableVariable(VariableTableReference vtr)
-        {
-            if (!tableVarible.ContainsKey(vtr.Variable.Name))
-            {
-                messages.addMessage(Code.T0000015, vtr, vtr.Variable.Name);
-                return null;
-            }
-            tableVarible[vtr.Variable.Name].Count++;
-            return tableVarible[vtr.Variable.Name].Obj;
-        }
-        private ScalarExpression convertExpression(ScalarExpression expression)
-        {
-            if (expression is Literal)
-            {
-                return expression;
-            }
-            if (expression is ConvertCall || expression is CastCall)
-            {
-                return getConvertOrCast(expression);
-            }
-            if (expression is VariableReference)
-            {
-                return getLiteral(expression as VariableReference);
-            }
-            if (expression is FunctionCall)
-            {
-                return getResultFunctionCall(expression as FunctionCall);
-            }
-            if (expression is LeftFunctionCall)
-            {
-                return new StringLiteral();
-            }
-            if (expression is RightFunctionCall)
-            {
-                return new StringLiteral();
-            }
-            return new StringLiteral();
-        }
-        private void getScalarSubquery(ScalarSubquery subquery)
-        {
-            if (subquery.QueryExpression is QuerySpecification)
-            {
-                var queryPart = subquery.QueryExpression as QuerySpecification;
-
-                if (queryPart.TopRowFilter != null)
-                {
-                    var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
-                    Literal literal = null;
-                    if (p.Expression is VariableReference)
-                    {
-                        literal = getLiteral(p.Expression as VariableReference);
-                    }
-                    else
-                    if (p.Expression is IntegerLiteral)
-                    {
-                        literal = p.Expression as IntegerLiteral;
-                    }
-                    if (literal == null)
-                    {
-                        messages.addMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
-                    }
-                    else
-                    {
-                        if (int.Parse(literal.Value) != 1)
-                        {
-                            messages.addMessage(Code.T0000035, subquery, literal.Value);
-                        }
-                    }
-                }
-                else
-                {
-                    if (queryPart.FromClause != null)
-                        messages.addMessage(Code.T0000034, subquery);
-                }
-
-                if (queryPart.WhereClause == null && queryPart.FromClause != null)
-                {
-                    messages.addMessage(Code.T0000037, subquery);
-                }
-
-                getQuerySpecification(queryPart);
-
-                if (queryPart.SelectElements.Count > 1)
-                {
-                    messages.addMessage(Code.T0000012, subquery);
-                }
-                else
-                if (queryPart.SelectElements.Count == 1)
-                {
-                    var el = queryPart.SelectElements[0];
-                    if (el is SelectStarExpression)
-                    {
-                        messages.addMessage(Code.T0000013, subquery);
-                        return;
-                    }
-                    if (el is SelectScalarExpression)
-                    {
-                        var expression = (el as SelectScalarExpression).Expression;
-                        if (expression is Literal)
-                        {
-
-                        }
-                        if (expression is ColumnReferenceExpression)
-                        {
-
-                        }
-                        if (expression is VariableReference)
-                        {
-
-                        }
-                        if (expression is ScalarSubquery)
-                        {
-                            getScalarSubquery(expression as ScalarSubquery);
-                        }
-                    }
-                }
-            }
-        }
-        private Literal getConvertOrCast(ScalarExpression secondExpression)
+        Literal getConvertOrCast(ScalarExpression secondExpression)
         {
             dynamic castCall = secondExpression as CastCall;
             if (secondExpression is ConvertCall)
@@ -780,7 +1073,7 @@ namespace SqlCheck
 
             if (castCall.Parameter is VariableReference)
             {
-                castCall.Parameter = getLiteral(castCall.Parameter as VariableReference);
+                castCall.Parameter = GetLiteral(castCall.Parameter as VariableReference);
             }
 
             StringLiteral sl = new StringLiteral();
@@ -799,34 +1092,94 @@ namespace SqlCheck
             }
             return sl;
         }
-        private Literal getResultFunctionCall(FunctionCall functionCall)
+        Literal getResultFunctionCall(FunctionCall functionCall)
         {
-            Console.WriteLine("Нужно дописать выполнение скалярной функции!");
+            //Console.WriteLine("Нужно дописать выполнение скалярной функции!");
+            if (string.Compare(functionCall.FunctionName.Value, "max", true) == 0)
+            {
+                foreach (var param in functionCall.Parameters)
+                {
+                    if (param is Literal)
+                    {
+                        messages.addMessage(Code.T0000047, param, functionCall.FunctionName.Value, (param as Literal).Value);
+                    }
+                    else
+                    if (param is ColumnReferenceExpression)
+                    {
+                        var columnex = checkedColumnReference((param as ColumnReferenceExpression));
+                    }
+                }
+            }
+            else
+            if (string.Compare(functionCall.FunctionName.Value, "object_id", true) == 0)
+            {
+                if (functionCall.Parameters.Count > 0)
+                {
+                    bool isValid = true;
+                    foreach (var item in functionCall.Parameters)
+                    {
+                        if (!(item is StringLiteral))
+                        {
+                            isValid = false;
+                            messages.addMessage(Code.T0000042, functionCall);
+                            break;
+                        }
+                    }
+                    if (isValid)
+                    {
+                        var par0 = (functionCall.Parameters[0] as StringLiteral).Value;
+                        string baseIdentifier = getBaseIdentifier(par0);
+                        if (string.IsNullOrEmpty(baseIdentifier))
+                        {
+                            messages.addMessage(Code.T0000043, functionCall, par0);
+                            return null;
+                        }
+                        compareNull.Add(baseIdentifier, new ReferCount<FunctionCall, int>(functionCall, 0));
+                    }
+                }
+            }
+
 
             return new StringLiteral();
         }
-        public void checkedBooleanComparison(BooleanExpression booleanExpression)
+        T calculate<T, T1>(BinaryExpression val, Func<string, T1> parse, Func<T1, T1, T1> result)
+             where T : Literal, new()
         {
-            if (booleanExpression is BooleanBinaryExpression)
-            {
-                checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).FirstExpression);
-                checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).SecondExpression);
-            }
-            if (booleanExpression is BooleanComparisonExpression)
-            {
-                checkedBooleanComparisonExpression(booleanExpression as BooleanComparisonExpression);
-            }
-            if (booleanExpression is BooleanIsNullExpression)
-            {
-                checkedBooleanIsNullExpression(booleanExpression as BooleanIsNullExpression);
-            }
-            if (booleanExpression is ExistsPredicate)
-            {
-
-            }
+            T res = new T();
+            res.Value = result(parse((val.FirstExpression as Literal).Value), parse((val.SecondExpression as Literal).Value)).ToString();
+            return res;
         }
-        void checkedBooleanComparisonExpression(BooleanComparisonExpression search)
+        ScalarExpression convertExpression(ScalarExpression expression)
         {
+            if (expression is Literal)
+            {
+                return expression;
+            }
+            if (expression is ConvertCall || expression is CastCall)
+            {
+                return getConvertOrCast(expression);
+            }
+            if (expression is VariableReference)
+            {
+                return GetLiteral(expression as VariableReference);
+            }
+            if (expression is FunctionCall)
+            {
+                return getResultFunctionCall(expression as FunctionCall);
+            }
+            if (expression is LeftFunctionCall)
+            {
+                return new StringLiteral();
+            }
+            if (expression is RightFunctionCall)
+            {
+                return new StringLiteral();
+            }
+            return new StringLiteral();
+        }
+        bool checkedBooleanComparisonExpression(BooleanComparisonExpression search)
+        {
+            bool IsCorrect = true;
             if (search.FirstExpression is ColumnReferenceExpression
                 && search.SecondExpression is ColumnReferenceExpression)
             {
@@ -835,8 +1188,7 @@ namespace SqlCheck
 
                 if (firstColumn.IsValid && firstColumn.IsValid && firstColumn != null && secondColumn != null)
                 {
-                    if (server.ConnectionContext.IsOpen)
-                        checkColumnFromServer(firstColumn.Column, secondColumn.Column);
+                    checkColumnType(firstColumn.Column, secondColumn.Column);
                 }
 
                 if (((firstColumn.Alias == null && secondColumn.Alias != null)
@@ -844,6 +1196,7 @@ namespace SqlCheck
                     && string.Compare(firstColumn.Name, secondColumn.Name, true) == 0)
                 {
                     messages.addMessage(Code.T0000031, search, secondColumn.Name);
+                    IsCorrect = false;
                 }
 
                 if (firstColumn.Alias != null && secondColumn.Alias != null)
@@ -853,12 +1206,14 @@ namespace SqlCheck
                     )
                     {
                         messages.addMessage(Code.T0000032, search, firstColumn.Alias);
+                        IsCorrect = false;
                     }
                     else
                     if (firstColumn.Alias != null && secondColumn.Alias != null
                         && string.Compare(firstColumn.Alias, secondColumn.Alias, true) == 0)
                     {
                         messages.addMessage(Code.T0000025, search, firstColumn.Alias);
+                        IsCorrect = false;
                     }
                 }
             }
@@ -879,6 +1234,7 @@ namespace SqlCheck
                             if (search.ComparisonType == BooleanComparisonType.Equals)
                             {
                                 messages.addMessage(Code.T0000020, search, firstColumn.FullName, search.ComparisonType.ToString());
+                                IsCorrect = false;
                             }
                         }
                     }
@@ -901,252 +1257,78 @@ namespace SqlCheck
 
                 }
             }
+            return IsCorrect;
+        }
+        string getNameIdentifiers(MultiPartIdentifier multiPart)
+        {
+            if (multiPart is SchemaObjectName)
+            {
+                var obj = multiPart as SchemaObjectName;
+                return getFullObject(obj.DatabaseIdentifier?.Value
+                                   , obj.SchemaIdentifier?.Value
+                                   , obj.BaseIdentifier.Value);
+            }
+
+            return string.Join(".", multiPart.Identifiers.Select(c => c.Value));
         }
         string getBaseIdentifier(string str)
         {
-            //return str.Replace("[", "").Replace("]", "");
-
+            string text = "";
             if (!str.Contains('.'))
             {
-                getFullObject(null,null,str);
-                //res = str.Replace("[", "").Replace("]", "");
+                text = getFullObject(null, null, str);
             }
             else
             {
                 string[] res;
                 if (str.Contains('[') && str.Contains(']'))
                 {
-                    res = str.Split(new[] { "].[", ".[", "]." }, StringSplitOptions.None);                    
+                    res = str.Split(new[] { "].[", ".[", "]." }, StringSplitOptions.None).
+                        Select(c => c.Replace("[", "").Replace("]", "")).ToArray();
                 }
                 else
                 {
-                    res = str.Split(new[] { "." }, StringSplitOptions.None);                    
+                    res = str.Split(new[] { "." }, StringSplitOptions.None);
                 }
                 if (res.Length > 0)
                 {
-                    getFullObject(
-                         res.Length>2?r[res.Length-3]:null
-                        ,res.Length>1?r[res.Length-2]:null
-                        ,res.Length>0?r[res.Length-1]:null)
+                    text = getFullObject(
+                          res.Length > 2 ? res[res.Length - 3] : null
+                        , res.Length > 1 ? res[res.Length - 2] : null
+                        , res.Length > 0 ? res[res.Length - 1] : null);
                 }
             }
+            return text;
+        }
+        string getFullObject(string Database, string Schema, string Base)
+        {
+            string res = "";
+            res += string.IsNullOrEmpty(Database) ? (string.IsNullOrEmpty(database) ? "" : database + ".") : Database + ".";
+            res += string.IsNullOrEmpty(Schema) ? "dbo." : Schema + ".";
+            res += Base;
             return res;
         }
-        private void checkedBooleanIsNullExpression(BooleanIsNullExpression booleanIsNullExpression)
+        bool checkedBooleanIsNullExpression(BooleanIsNullExpression booleanIsNullExpression)
         {
             if (booleanIsNullExpression.Expression is ColumnReferenceExpression)
             {
                 var ex = booleanIsNullExpression.Expression as ColumnReferenceExpression;
-                //проверить что поле может принимать значение null, иначе сравнение не корректно
-                //messages.addMessage(Code.T0000021, getNameColumn(ex.MultiPartIdentifier.Identifiers));
+                MyColumn myColumn = checkedColumnReference(ex);
+
+                if (myColumn != null && !myColumn.IsNullable)
+                {
+                    //проверить что поле может принимать значение null, иначе сравнение не корректно
+                    messages.addMessage(Code.T0000021, ex, getNameIdentifiers(ex.MultiPartIdentifier));
+                    return false;
+                }
+                return true;
             }
 
             if (booleanIsNullExpression.Expression is FunctionCall)
             {
-                var func = booleanIsNullExpression.Expression as FunctionCall;
-                if (string.Compare(func.FunctionName.Value, "object_id", true) == 0)
-                {
-                    if (func.Parameters.Count > 0)
-                    {
-                        bool isValid = true;
-                        foreach (var item in func.Parameters)
-                        {
-                            if (!(item is StringLiteral))
-                            {
-                                isValid = false;
-                                messages.addMessage(Code.T0000042, booleanIsNullExpression);
-                                break;
-                            }
-                        }
-                        if (isValid)
-                        {
-                            var par0 = (func.Parameters[0] as StringLiteral).Value;
-                            string baseIdentifier = getBaseIdentifier(par0);
-                            if (string.IsNullOrEmpty(baseIdentifier))
-                            {
-                                messages.addMessage(Code.T0000043, booleanIsNullExpression, par0);
-                                return;
-                            }
-                            compareNull.Add(baseIdentifier, new ReferCount<BooleanIsNullExpression, int>(booleanIsNullExpression, 0));
-                        }
-                    }
-                }
+                return true;
             }
-        }
-        private MyColumn checkedColumnReference(ColumnReferenceExpression Expression)
-        {
-            var column = new MyColumn(null);
-            var Identifiers = Expression.MultiPartIdentifier.Identifiers;
-            column.Alias = Identifiers.Count > 1 ? Identifiers[Identifiers.Count - 2].Value : null;
-            column.Name = Identifiers[Identifiers.Count - 1].Value;
-
-            column.IsValid = !(Identifiers.Count > 2);
-
-            if (!column.IsValid)
-            {
-                messages.addMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
-            }
-            if (IsAliasAll && column.Alias == null)
-            {
-                messages.addMessage(Code.T0000019, Expression, column.Name);
-            }
-            if (column.IsValid && server.ConnectionContext.IsOpen)
-            {
-                column.Column = checableColumnFromServer(column.Alias, column.Name)?.Column;
-            }
-            return column;
-        }
-        private void checkColumnFromServer(Column firstColumn, Column secondColumn)
-        {
-#warning включить проверки по типам
-            if (firstColumn != null && secondColumn != null)
-            {
-                if (firstColumn.DataType != secondColumn.DataType)
-                {
-                    messages.addMessage(new MyTyps("типы для таблиц не равны!", TypeMessage.Error), null);
-                }
-            }
-        }
-
-        private MyColumn checableColumnFromServer(string firstAlias, string firstname)
-        {
-            MyColumn column = null;
-            if (firstAlias != null)
-            {
-                var t = getTableFromAlias(firstAlias);
-                if (t is NamedTableReference)
-                {
-                    var table = GetObjectFromServer(t as NamedTableReference) as MyTable;
-
-                    //if (!table.IsExists)
-                    //{
-                    //    messages.addMessage(Code.T0000028, table.Name);
-                    //}
-
-                    column = table.Columns.SingleOrDefault(c => string.Compare(c.Name, firstname, true) == 0);
-                    if (column == null)
-                    {
-                        messages.addMessage(Code.T0000029, t, firstname);
-                    }
-                }
-            }
-            else
-            {
-                List<MyColumn> cols = new List<MyColumn>();
-                foreach (var table in tables)
-                {
-                    var tableFromServer = GetObjectFromServer(table.Value.Obj as NamedTableReference) as MyTable;
-                    if (tableFromServer.IsExists)
-                    {
-                        cols.AddRange(tableFromServer.Columns.Where(c => string.Compare(c.Name, firstname, true) == 0).ToList());
-
-                        if (cols.Count > 1)
-                            break;
-                    }
-                }
-                if (cols.Count == 1)
-                {
-                    return cols[0];
-                }
-                if (cols.Count > 1)
-                {
-                    messages.addMessage(Code.T0000033, null, firstname);
-                }
-                messages.addMessage(Code.T0000030, null, firstname);
-            }
-            return column;
-        }
-
-        private TSqlFragment getTableFromAlias(string alias)
-        {
-            bool T = tables.ContainsKey(alias);
-            bool W = withTables.ContainsKey(alias);
-            if (!T && !W)
-            {
-                messages.addMessage(Code.T0000014, null, alias);
-            }
-            else
-            if (T)
-            {
-                tables[alias].Count++;
-                return tables[alias].Obj;
-            }
-            else
-            if (W)
-            {
-                withTables[alias].Count++;
-                return withTables[alias].Obj;
-            }
-            return null;
-        }
-
-        private void getTableServerFromAlias(string firstAlias)
-        {
-            throw new NotImplementedException();
-        }
-
-        string getFullObject(string Database,string Schema, string Base)
-        {
-            string res = "";
-            res += Database == null ? (string.IsNullOrEmpty(database) ? "" : database + ".") : Database + ".";
-            res += Schema == null ? "dbo." : Schema + ".";
-            res += Base;
-            return res;
-        }
-
-        private string getNameIdentifiers(MultiPartIdentifier multiPart)
-        {
-            if (multiPart is SchemaObjectName)
-            {
-                var obj = multiPart as SchemaObjectName;                
-                return getFullObject(obj.DatabaseIdentifier?.Value, obj.SchemaIdentifier?.Value, obj.BaseIdentifier.Value);
-            }
-
-            return string.Join(".", multiPart.Identifiers.Select(c => c.Value));
-        }
-        private string getNameTable(TableReference table)
-        {
-            if (table is NamedTableReference)
-            {
-                var named = table as NamedTableReference;
-                return getNameIdentifiers(named.SchemaObject);
-            }
-            return null;
-        }
-
-
-        private string getAliasTable(TableReference table)
-        {
-            if (table is NamedTableReference)
-            {
-                return (table as NamedTableReference)?.Alias?.Value;
-            }
-            if (table is VariableTableReference)
-            {
-                return (table as VariableTableReference)?.Alias?.Value;
-            }
-            if (table is QueryDerivedTable)
-            {
-                return (table as QueryDerivedTable)?.Alias?.Value;
-            }
-            return null;
-        }
-
-
-        void AddTable(TableReference tableReference)
-        {
-            string key = getAliasTable(tableReference);
-            if (key == null)
-            {
-                IsAliasAll = false;
-                key = getNameTable(tableReference);
-            }
-            if (tables.ContainsKey(key))
-            {
-                messages.addMessage(Code.T0000017, tableReference, key, getNameTable(tables[key].Obj));
-                return;
-            }
-            tables.Add(key, new ReferCount<TableReference, int>(tableReference, 0));
+            return true;
         }
         public object CloneObject(object obj)
         {

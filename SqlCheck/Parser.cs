@@ -130,7 +130,12 @@ namespace SqlCheck
             foreach (var statement in statements)
             {
                 if (statement == null) continue;
-                if(statement is AlterTableAddTableElementStatement)
+                if(statement is UseStatement)
+                {
+                    chekable.getUseStatement(statement as UseStatement);
+                }
+                else
+                if (statement is AlterTableAddTableElementStatement)
                 {
                     chekable.getAlterTableAddTableElementStatement(statement as AlterTableAddTableElementStatement);
                 }
@@ -176,7 +181,9 @@ namespace SqlCheck
                     }
 
                     CheckStatment(path, new[] { ifStatement.ThenStatement });
+                    chekable.clearObjectFromStatement();
                     CheckStatment(path, new[] { ifStatement.ElseStatement });
+                    chekable.clearObjectFromStatement();
                 }
                 else
                 if (statement is BeginEndBlockStatement)
@@ -227,6 +234,8 @@ namespace SqlCheck
                 //chekable.clearObjectFromStatement();
             }
         }
+
+        
 
         private void SaveToFileParseError(string path, string v)
         {
