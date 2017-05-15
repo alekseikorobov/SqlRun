@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using CommandLine;
+﻿using CommandLine;
 using CommandLine.Text;
-using System.Configuration;
-using System.Text.RegularExpressions;
 
 namespace SqlRun
 {
@@ -35,46 +28,10 @@ namespace SqlRun
         public string Patern { get; set; }
         public bool Verbose { get; set; }
 
-        [Option('t', "test", Required = false, HelpText = "Db connection database name")]
+        [Option('t', "test", Required = false, HelpText = "")]
         public bool IsTest { get; set; }
-        public string ConnectionString
-        {
-            get
-            {
-                var connectionString = "";
-                if (ConfigurationManager.ConnectionStrings != null
-                    && ConfigurationManager.ConnectionStrings.Count > 0
-                    && ConfigurationManager.ConnectionStrings["Default"] != null)
-                    connectionString = ConfigurationManager.ConnectionStrings["Default"].ConnectionString;
-
-                if (string.IsNullOrEmpty(connectionString))
-                {
-                    if (!string.IsNullOrEmpty(DataBase) && !string.IsNullOrEmpty(Source))
-                    {
-                        connectionString = $"data source={Source};initial catalog={DataBase};integrated security=True;application name={DataBase};MultipleActiveResultSets=True";
-                    }
-                    else
-                    {
-                        throw new Exception("Не указано подключение, ни в конфиге ни в параметрах");
-                    }
-                }
-                else
-                {
-                    if (!string.IsNullOrEmpty(DataBase))
-                    {
-                        connectionString = Regex.Replace(connectionString, @"initial catalog\=(.*?);", $"initial catalog={DataBase};");
-                        connectionString = Regex.Replace(connectionString, @"application name\=(.*?);", $"initial catalog={DataBase};");
-                    }
-                    if (!string.IsNullOrEmpty(Source))
-                    {
-                        connectionString = Regex.Replace(connectionString, @"data source\=(.*?);", $"data source={Source};");
-                    }
-                }
-                //Console.WriteLine("connectionString - {0}", connectionString);
-
-                return connectionString;
-            }
-        }
+        [Option('n', "notconnect", Required = false, HelpText = "")]
+        public bool IsNotConnect { get; internal set; }
 
         [HelpOption]
         public string GetUsage()

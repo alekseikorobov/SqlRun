@@ -75,6 +75,7 @@
   <ItemGroup>
     <Compile Include="Options.cs" />
     <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SqlProvider.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -85,9 +86,7 @@
       <SubType>Designer</SubType>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\SqlCheck\SqlCheck.csproj">
       <Project>{68208450-b352-438d-a9de-d08795d93f37}</Project>

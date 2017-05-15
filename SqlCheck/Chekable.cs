@@ -160,6 +160,7 @@ namespace SqlCheck
                 }
                 else
                 {
+                    IsAliasAll = false;
                     table = GetMyTable(target, true);
                 }
 
@@ -633,7 +634,7 @@ namespace SqlCheck
             }
             return null;
         }
-        TSqlFragment getTableFromAlias(string alias,TSqlFragment fragment, bool isSendMessage = true)
+        TSqlFragment getTableFromAlias(string alias, TSqlFragment fragment, bool isSendMessage = true)
         {
             bool T = tables.ContainsKey(alias);
             bool W = withTables.ContainsKey(alias);
@@ -735,7 +736,7 @@ namespace SqlCheck
         #endregion
 
         #region Column
-        MyColumn getMyColumn(string alias, string columnName,TSqlFragment fragment)
+        MyColumn getMyColumn(string alias, string columnName, TSqlFragment fragment)
         {
             MyColumn column = null;
             column = getColumnFromDerivedTable(alias, columnName, fragment);
@@ -792,11 +793,12 @@ namespace SqlCheck
         private MyColumn getColumnFromDerivedTable(string alias, string columnName, TSqlFragment fragment)
         {
             MyColumn column = null;
-            var derTables = derivedTables.Peek();
+            var derTables = derivedTables.Any() ? derivedTables.Peek() : null;
+            if (derTables == null) return null;
             if (alias != null)
             {
                 var table = derTables.SingleOrDefault(c => c.Name == alias);
-                if(table != null)
+                if (table != null)
                     return table.getColumn(columnName);
             }
             else
@@ -891,6 +893,16 @@ namespace SqlCheck
                 foreach (TableReference tableReference in from.TableReferences)
                 {
                     CheckeTableReference(tableReference);
+                }
+            }
+            if (Query.OrderByClause != null)
+            {
+                foreach (var element in Query.OrderByClause.OrderByElements)
+                {
+                    if (element.Expression is Literal)
+                    {
+                        messages.addMessage(Code.T0000051, element.Expression);
+                    }
                 }
             }
             foreach (var element in Query.SelectElements)
@@ -1382,6 +1394,7 @@ namespace SqlCheck
 
             if (booleanIsNullExpression.Expression is FunctionCall)
             {
+                getResultFunctionCall(booleanIsNullExpression.Expression as FunctionCall);
                 return true;
             }
             return true;

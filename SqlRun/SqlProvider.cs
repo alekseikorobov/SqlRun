@@ -1,6 +1,8 @@
 ﻿using System;
 using Microsoft.SqlServer.Management.Smo;
 using Microsoft.SqlServer.Management.Common;
+using System.Configuration;
+using System.Text.RegularExpressions;
 
 namespace SqlRun
 {
@@ -89,13 +91,51 @@ namespace SqlRun
 
             //Context = new DbContext(connectionString);
 
-            System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection(options.ConnectionString);
+            System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection(ConnectionString());
             //server = new System.Data.SqlClient.SqlCommand();
             //server.Connection = conn;
             //conn.Open();
 
             server = new Server(new ServerConnection(conn));
             //server.ConnectionContext.Connect();
+        }
+
+        public string ConnectionString()
+        {
+
+            var connectionString = "";
+            if (ConfigurationManager.ConnectionStrings != null
+                && ConfigurationManager.ConnectionStrings.Count > 0
+                && ConfigurationManager.ConnectionStrings["Default"] != null)
+                connectionString = ConfigurationManager.ConnectionStrings["Default"].ConnectionString;
+
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                if (!string.IsNullOrEmpty(options.DataBase) && !string.IsNullOrEmpty(options.Source))
+                {
+                    connectionString = $"data source={options.Source};initial catalog={options.DataBase};integrated security=True;application name={options.DataBase};MultipleActiveResultSets=True";
+                }
+                else
+                {
+                    throw new Exception("Не указано подключение, ни в конфиге ни в параметрах");
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(options.DataBase))
+                {
+                    connectionString = Regex.Replace(connectionString, @"initial catalog\=(.*?);", $"initial catalog={options.DataBase};");
+                    connectionString = Regex.Replace(connectionString, @"application name\=(.*?);", $"initial catalog={options.DataBase};");
+                }
+                if (!string.IsNullOrEmpty(options.Source))
+                {
+                    connectionString = Regex.Replace(connectionString, @"data source\=(.*?);", $"data source={options.Source};");
+                }
+            }
+            //Console.WriteLine("connectionString - {0}", connectionString);
+
+            return connectionString;
+
         }
     }
 }

@@ -1,7 +1,10 @@
 ﻿--select t.id,t.name from (select id,name from tabl) t1
 
-select t1.id,t.name 
-from (select id,n as name,tab=n1 from t) t1
+--select t1.id,t.name 
+--from (select id,n as name,tab=n1 from t) t1
+
+select * from tab
+order by 1
 
 --select t2.id,t2.name 
 --from (

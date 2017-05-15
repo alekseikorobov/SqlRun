@@ -21,6 +21,7 @@ namespace SqlRun
             args = new[]
             {
                 "-t",
+                "-n",
                 "-p",
                 @"script.sql"
             };
@@ -80,11 +81,12 @@ namespace SqlRun
                 }
                 //test(args); return;
 
-                parser = new SqlCheck.Parser(); //options.ConnectionString
+                SqlProvider = new SqlProvider(options);
+
+                parser = options.IsNotConnect ? new SqlCheck.Parser(SqlProvider.ConnectionString()) : new SqlCheck.Parser();
 
                 if (!options.IsTest)
                 {
-                    SqlProvider = new SqlProvider(options);
                     SqlProvider.InitConection();
                 }
 
@@ -225,10 +227,13 @@ namespace SqlRun
                 }
                 if (!options.IsTest)
                 {
-                    Console.WriteLine("Продолжить?");
                     if (messages.Any())
                     {
-                        Console.ReadLine();
+                        isStop = true;
+                        Console.WriteLine("Продолжить?");
+                        string res = Console.ReadLine();
+                        if (res != "y")
+                            return;
                     }
                     SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
                 }
@@ -236,7 +241,7 @@ namespace SqlRun
                 {
                     if (messages.Any())
                     {
-                        Console.ReadLine();
+                        isStop = true;
                     }
                 }
             }
