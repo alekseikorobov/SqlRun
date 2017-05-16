@@ -5,3 +5,10 @@
 /SqlCheck/obj/Debug
 /SqlCheck/bin/Debug
 /SqlCheck/SqlCheck.csproj.user
+/packages
+/SqlCheck/bin/Release
+/SqlCheck/obj/Release
+/SqlRun/bin/Release
+/SqlRun/bin/Debug
+/SqlRun/obj/Release
+/SqlRun/obj/Debug

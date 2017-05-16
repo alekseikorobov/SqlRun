@@ -18,6 +18,7 @@ namespace SqlRun
 
         static void Main(string[] args)
         {
+#if DEBUG
             args = new[]
             {
                 "-t",
@@ -25,6 +26,7 @@ namespace SqlRun
                 "-p",
                 @"script.sql"
             };
+#endif
             bool IsDirectory = true;
             bool IsFromFile = false;
             try
@@ -202,7 +204,7 @@ namespace SqlRun
         {
             try
             {
-                Console.WriteLine("file - {0}", Path.GetFileNameWithoutExtension(file));
+                Console.WriteLine("file - {0}", file);
 
                 var messages = parser.ParserFile(file);
 
@@ -230,7 +232,7 @@ namespace SqlRun
                     if (messages.Any())
                     {
                         isStop = true;
-                        Console.WriteLine("Продолжить?");
+                        Console.Write("Продолжить?  (y/n): ");
                         string res = Console.ReadLine();
                         if (res != "y")
                             return;

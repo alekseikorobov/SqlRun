@@ -58,7 +58,8 @@ namespace SqlCheck.Modele
         T0000048,
         T0000049,
         T0000050,
-        T0000051
+        T0000051,
+        T0000052
     }
     public enum TypeMessage
     {
@@ -145,6 +146,7 @@ namespace SqlCheck.Modele
             , { Code.T0000049,new MyTyps("Указанное поле '{0}' отсутствует в таблице '{1}'")}
             , { Code.T0000050,new MyTyps("Таблица или указанный алиас '{0}' для update отсутствует в выборке from")}
             , { Code.T0000051,new MyTyps("В предложении Order by не слудует использовать константы")}
+            , { Code.T0000052,new MyTyps("")}
 
         };
         public static MyTyps GetMessage(Code Code)

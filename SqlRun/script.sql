@@ -1,10 +1,39 @@
-﻿--select t.id,t.name from (select id,name from tabl) t1
+﻿---Проверки существования полей
+
+
+if Exists(select 1 from sys.columns where object_id = object_id('audit_dpp_DeliverableProcessingRequest','U') and name = 'EngagementID')
+begin
+	ALTER TABLE [audit_dpp_DeliverableProcessingRequest] DROP COLUMN EngagementID
+end
+
+if not Exists(select 1 from sys.columns where object_id = object_id('audit_dpp_DeliverableProcessingTaskProfile','U') and name = 'FirmID')
+begin
+	ALTER TABLE audit_dpp_DeliverableProcessingTaskProfile ADD FirmID INT
+end
+
+ALTER TABLE [audit_dpp_DeliverableProcessingRequest] DROP COLUMN EngagementID
+ALTER TABLE audit_dpp_DeliverableProcessingTaskProfile ADD FirmID INT
+
+
+--ALTER PROCEDURE [dbo].[Audit_DPP_Deliverables] ( @login NVARCHAR(60))
+--AS
+--BEGIN
+
+--	SELECT *
+--	FROM      [Business].[Engagement]                    e
+--	WHERE ad.DeliverableID IN (SELECT ID
+--		FROM [dbo].[audit_dpp_AvailableDeliverable](@login) )
+--	ORDER BY e.[OpenDate] DESC
+--	,        adt.BalanceSheetDate DESC
+--END
+
+
+--select t.id,t.name from (select id,name from tabl) t1
 
 --select t1.id,t.name 
 --from (select id,n as name,tab=n1 from t) t1
 
-select * from tab
-order by 1
+--select * from tab order by 1
 
 --select t2.id,t2.name 
 --from (

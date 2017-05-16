@@ -128,7 +128,13 @@ namespace SqlCheck
             foreach (var statement in statements)
             {
                 if (statement == null) continue;
-                if(statement is UseStatement)
+
+                if (statement is CreateFunctionStatement)
+                {
+                    chekable.getCreateFunctionStatement(statement as CreateFunctionStatement);
+                }
+                else
+                if (statement is UseStatement)
                 {
                     chekable.getUseStatement(statement as UseStatement);
                 }
@@ -202,11 +208,13 @@ namespace SqlCheck
                 if (statement is DeclareVariableStatement)
                 {
                     chekable.getDeclareVariableStatement(statement as DeclareVariableStatement);
+                    //chekable.clearObjectFromStatement();
                 }
                 else
                 if (statement is DeclareTableVariableStatement)
                 {
                     chekable.getDeclareTableVariableStatement(statement as DeclareTableVariableStatement);
+                    //chekable.clearObjectFromStatement();
                 }
                 else
                 if (statement is SelectStatement)
@@ -218,6 +226,7 @@ namespace SqlCheck
                 if (statement is InsertStatement)
                 {
                     chekable.getInsertStatement(statement as InsertStatement);
+                    chekable.clearObjectFromStatement();
                 }
                 else
                 if (statement is DropTableStatement)

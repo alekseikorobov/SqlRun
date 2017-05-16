@@ -3,6 +3,9 @@ using Microsoft.SqlServer.Management.Smo;
 using Microsoft.SqlServer.Management.Common;
 using System.Configuration;
 using System.Text.RegularExpressions;
+using System.IO;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
+using System.Collections.Generic;
 
 namespace SqlRun
 {
@@ -10,8 +13,8 @@ namespace SqlRun
     {
         //static DbContext Context;
         private Options options;
-        Microsoft.SqlServer.Management.Smo.Server server;
-        //System.Data.SqlClient.SqlCommand server;
+        //Microsoft.SqlServer.Management.Smo.Server server;
+        System.Data.SqlClient.SqlCommand server;
 
         public SqlProvider(Options options)
         {
@@ -19,8 +22,33 @@ namespace SqlRun
         }
         public void ExecuteSqlCommand(string script)
         {
-            int count = server.ConnectionContext.ExecuteNonQuery(script);
-            Console.WriteLine("return {0}", count, "");
+            //int count = server.ConnectionContext.ExecuteNonQuery(script);
+            //Console.WriteLine("return {0}", count, "");
+
+            TSql100Parser t = new TSql100Parser(true);
+
+            using (TextReader open = new StringReader(script))
+            {
+                IList<ParseError> errors;
+                TSqlFragment frag = t.Parse(open, out errors);
+
+                var s = frag as TSqlScript;
+                int part = 0;
+                foreach (var item in s.Batches)
+                {
+                    SqlScriptGeneratorOptions opt = new SqlScriptGeneratorOptions();
+                    Sql100ScriptGenerator gen = new Sql100ScriptGenerator();
+                    string sql;
+                    gen.GenerateScript(item, out sql);
+
+                    server.CommandText = sql;
+                    int count = server.ExecuteNonQuery();
+
+                    //int count = server.ConnectionContext.ExecuteNonQuery(sql);
+
+                    Console.WriteLine("return {0} - {1}", count, (s.Batches.Count > 0 ? " Part - " + part.ToString() : ""));
+                }
+            }
         }
         //public void ExecuteSqlCommand(string script)
         //{
@@ -92,11 +120,11 @@ namespace SqlRun
             //Context = new DbContext(connectionString);
 
             System.Data.SqlClient.SqlConnection conn = new System.Data.SqlClient.SqlConnection(ConnectionString());
-            //server = new System.Data.SqlClient.SqlCommand();
-            //server.Connection = conn;
-            //conn.Open();
+            server = new System.Data.SqlClient.SqlCommand();
+            server.Connection = conn;
+            conn.Open();
 
-            server = new Server(new ServerConnection(conn));
+            //server = new Server(new ServerConnection(conn));
             //server.ConnectionContext.Connect();
         }
 

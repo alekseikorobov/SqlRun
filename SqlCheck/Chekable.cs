@@ -115,7 +115,19 @@ namespace SqlCheck
             }
         }
 
+
         #region Statements
+        public void getCreateFunctionStatement(CreateFunctionStatement createFunctionStatement)
+        {
+            if (createFunctionStatement.ReturnType != null)
+            {
+                if (createFunctionStatement.ReturnType is TableValuedFunctionReturnType)
+                {
+                    var t = createFunctionStatement.ReturnType as TableValuedFunctionReturnType;
+                    tableVarible.Add(t.DeclareTableVariableBody.VariableName.Value, new ReferCount<DeclareTableVariableBody, int>(t.DeclareTableVariableBody, 0));
+                }
+            }
+        }
         public void getUseStatement(UseStatement useStatement)
         {
             this.database = useStatement.DatabaseName.Value;
@@ -300,7 +312,7 @@ namespace SqlCheck
             if (statement.InsertSpecification.Target is NamedTableReference)
             {
                 var Target = statement.InsertSpecification.Target as NamedTableReference;
-                CheckeTableReference(Target);
+                CheckeTableReference(Target,false);
                 target = getNameTable(Target);
                 if (!IsTempTable(target))
                 {
@@ -312,8 +324,11 @@ namespace SqlCheck
             if (statement.InsertSpecification.Target is VariableTableReference)
             {
                 var body = getDeclareTableVariable(statement.InsertSpecification.Target as VariableTableReference);
-                columns = body.Definition.ColumnDefinitions.ToList();
-                target = body.VariableName.Value;
+                if (body != null)
+                {
+                    columns = body.Definition.ColumnDefinitions.ToList();
+                    target = body.VariableName.Value;
+                }
             }
             if (statement.InsertSpecification.Columns.Count == 0)
             {
@@ -535,6 +550,17 @@ namespace SqlCheck
             {
                 return true;
             }
+            if (booleanExpression is InPredicate)
+            {
+                if ((booleanExpression as InPredicate).Expression is ColumnReferenceExpression)
+                {
+                    checkedColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression);
+                }
+                if ((booleanExpression as InPredicate).Subquery is ScalarSubquery)
+                {
+                    GetScalarSubquery((booleanExpression as InPredicate).Subquery as ScalarSubquery);
+                }
+            }
             return true;
         }
         #endregion
@@ -564,7 +590,7 @@ namespace SqlCheck
             return myTable;
 
         }
-        void CheckeTableReference(TableReference tableReference)
+        void CheckeTableReference(TableReference tableReference,bool isAdd = true)
         {
             if (tableReference is QualifiedJoin)
             {
@@ -588,7 +614,8 @@ namespace SqlCheck
                 {
                     ////
                 }
-                AddTable(tableReference);
+                if(isAdd)
+                    AddTable(tableReference);
             }
             if (tableReference is VariableTableReference)
             {
@@ -603,6 +630,23 @@ namespace SqlCheck
                 ///пока не понятно когда очищать этот список
 
                 GetQuerySpecification(query.QueryExpression as QuerySpecification, derivedTables.Peek());
+            }
+            if (tableReference is SchemaObjectFunctionTableReference)
+            {
+                var t = tableReference as SchemaObjectFunctionTableReference;
+
+                if (t.Alias == null)
+                {
+                    IsAliasAll = false;
+                }
+
+                foreach (var param in t.Parameters)
+                {
+                    if (param is VariableReference)
+                    {
+                        var r = getDeclare(param as VariableReference);
+                    }
+                }
             }
         }
         CreateTableStatement GetTempTable(MultiPartIdentifier dif)
@@ -973,38 +1017,53 @@ namespace SqlCheck
             {
                 var queryPart = subquery.QueryExpression as QuerySpecification;
 
+                bool isFunc = queryPart.FromClause != null
+                        && queryPart.FromClause.TableReferences.Count == 1
+                        && queryPart.FromClause.TableReferences[0] is SchemaObjectFunctionTableReference;
+
                 if (queryPart.TopRowFilter != null)
                 {
-                    var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
                     Literal literal = null;
-                    if (p.Expression is VariableReference)
+                    if (queryPart.TopRowFilter.Expression is ParenthesisExpression)
                     {
-                        literal = GetLiteral(p.Expression as VariableReference);
-                    }
-                    else
-                    if (p.Expression is IntegerLiteral)
-                    {
-                        literal = p.Expression as IntegerLiteral;
-                    }
-                    if (literal == null)
-                    {
-                        messages.addMessage(Code.T0000036, subquery, p.Expression.GetType().Name);
-                    }
-                    else
-                    {
-                        if (int.Parse(literal.Value) != 1)
+                        var p = queryPart.TopRowFilter.Expression as ParenthesisExpression;
+                        if (p.Expression is VariableReference)
                         {
-                            messages.addMessage(Code.T0000035, subquery, literal.Value);
+                            literal = GetLiteral(p.Expression as VariableReference);
                         }
+                        else
+                        if (p.Expression is IntegerLiteral)
+                        {
+                            literal = p.Expression as IntegerLiteral;
+                        }
+                        else
+                        {
+                            messages.addMessage(Code.T0000036, queryPart.TopRowFilter.Expression, p.Expression.GetType().Name);
+                        }
+                    }
+                    if (queryPart.TopRowFilter.Expression is Literal)
+                    {
+                        if (queryPart.TopRowFilter.Expression is IntegerLiteral)
+                        {
+                            literal = queryPart.TopRowFilter.Expression as IntegerLiteral;
+                        }
+                        else
+                        {
+                            messages.addMessage(Code.T0000036, queryPart.TopRowFilter.Expression, queryPart.TopRowFilter.Expression.GetType().Name);
+                        }
+                    }
+                    if (literal != null && int.Parse(literal.Value) != 1)
+                    {
+                        messages.addMessage(Code.T0000035, subquery, literal.Value);
                     }
                 }
                 else
                 {
-                    if (queryPart.FromClause != null)
+                    if (!isFunc && queryPart.FromClause != null)
                         messages.addMessage(Code.T0000034, subquery);
                 }
 
-                if (queryPart.WhereClause == null && queryPart.FromClause != null)
+                if (queryPart.WhereClause == null && queryPart.FromClause != null && !isFunc)
                 {
                     messages.addMessage(Code.T0000037, subquery);
                 }
