@@ -13,31 +13,26 @@ namespace SqlCheck
 {
     public class Chekable
     {
-        Dictionary<string, MyTable> TableFromServer = new Dictionary<string, MyTable>();
+        bool IsIgnoreCase = true;
+
+        StringComparer caseParam;
         string database = "";
         string schema = "dbo";
         string serverName = "";
         bool IsAliasAll = true;
         public Message messages = new Message();
         Server server;
-        Dictionary<string, ReferCount<DeclareVariableElement, int>> varible
-            = new Dictionary<string, ReferCount<DeclareVariableElement, int>>();
-        Dictionary<string, ReferCount<ProcedureParameter, int>> parametrs
-            = new Dictionary<string, ReferCount<ProcedureParameter, int>>();
-        Dictionary<string, ReferCount<SchemaObjectName, int>> dropTebles
-            = new Dictionary<string, ReferCount<SchemaObjectName, int>>();
-        Dictionary<string, ReferCount<FunctionCall, int>> compareNull
-            = new Dictionary<string, ReferCount<FunctionCall, int>>();
-        Dictionary<string, ReferCount<CreateTableStatement, int>> tempTeble
-            = new Dictionary<string, ReferCount<CreateTableStatement, int>>();
-        Dictionary<string, ReferCount<CreateTableStatement, int>> createTebles
-            = new Dictionary<string, ReferCount<CreateTableStatement, int>>();
-        Dictionary<string, ReferCount<DeclareTableVariableBody, int>> tableVarible
-            = new Dictionary<string, ReferCount<DeclareTableVariableBody, int>>();
-        Dictionary<string, ReferCount<TableReference, int>> tables =
-            new Dictionary<string, ReferCount<TableReference, int>>();
-        Dictionary<string, ReferCount<CommonTableExpression, int>> withTables
-            = new Dictionary<string, ReferCount<CommonTableExpression, int>>();
+
+        Dictionary<string, MyTable> TableFromServer;
+        Dictionary<string, ReferCount<DeclareVariableElement, int>> varible;
+        Dictionary<string, ReferCount<ProcedureParameter, int>> parametrs;
+        Dictionary<string, ReferCount<SchemaObjectName, int>> dropTebles;
+        Dictionary<string, ReferCount<FunctionCall, int>> compareNull;
+        Dictionary<string, ReferCount<CreateTableStatement, int>> tempTeble;
+        Dictionary<string, ReferCount<CreateTableStatement, int>> createTebles;
+        Dictionary<string, ReferCount<DeclareTableVariableBody, int>> tableVarible;
+        Dictionary<string, ReferCount<TableReference, int>> tables;
+        Dictionary<string, ReferCount<CommonTableExpression, int>> withTables;
 
         List<string> AlterTables = new List<string>();
 
@@ -89,12 +84,32 @@ namespace SqlCheck
         public Chekable()
         {
             server = new Server();
+
+            if (IsIgnoreCase)
+            {
+                caseParam = StringComparer.OrdinalIgnoreCase;
+            }
+            else
+            {
+                caseParam = null;
+            }
+            TableFromServer = new Dictionary<string, MyTable>(caseParam);
+            varible = new Dictionary<string, ReferCount<DeclareVariableElement, int>>(caseParam);
+            parametrs = new Dictionary<string, ReferCount<ProcedureParameter, int>>(caseParam);
+            dropTebles = new Dictionary<string, ReferCount<SchemaObjectName, int>>(caseParam);
+            compareNull = new Dictionary<string, ReferCount<FunctionCall, int>>(caseParam);
+            tempTeble = new Dictionary<string, ReferCount<CreateTableStatement, int>>(caseParam);
+            createTebles = new Dictionary<string, ReferCount<CreateTableStatement, int>>(caseParam);
+            tableVarible = new Dictionary<string, ReferCount<DeclareTableVariableBody, int>>(caseParam);
+            tables = new Dictionary<string, ReferCount<TableReference, int>>(caseParam);
+            withTables = new Dictionary<string, ReferCount<CommonTableExpression, int>>(caseParam);
+
+
         }
-        public Chekable(string ConnectionString)
+        public Chekable(string ConnectionString) : this()
         {
             try
             {
-                server = new Server();
                 server.ConnectionContext.ConnectionString = ConnectionString;
                 server.ConnectionContext.Connect();
                 if (server.ConnectionContext.IsOpen)
@@ -134,7 +149,7 @@ namespace SqlCheck
         }
         public void getAlterTableAddTableElementStatement(AlterTableAddTableElementStatement alterTableAddTableElementStatement)
         {
-            if (!AlterTables.Any(c => string.Compare(c, alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value, true) == 0))
+            if (!AlterTables.Any(c => string.Compare(c, alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value, IsIgnoreCase) == 0))
             {
                 AlterTables.Add(alterTableAddTableElementStatement.SchemaObjectName.BaseIdentifier.Value);
             }
@@ -160,6 +175,27 @@ namespace SqlCheck
                     if (ta == null)
                     {
                         ta = getTableFromAlias(target.SchemaObject.BaseIdentifier.Value, target, false) as NamedTableReference;
+                        if (ta == null)
+                        {
+                            string targetName = getNameTable(target);
+                            foreach (var t in tables)
+                            {
+                                if (t.Value.Obj is NamedTableReference)
+                                {
+                                    var tableObj = t.Value.Obj as NamedTableReference;
+                                    string tableName = getNameTable(tableObj);
+
+                                    if (string.Compare(targetName, tableName, IsIgnoreCase) == 0)
+                                    {
+                                        ta = tableObj;
+
+                                        messages.addMessage(Code.T0000052, target, t.Key);
+
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                     if (ta != null)
                     {
@@ -223,7 +259,7 @@ namespace SqlCheck
                     }
                 }
 
-                if (AlterTables.Any(c => string.Compare(c, target.SchemaObject.BaseIdentifier.Value, true) == 0))
+                if (AlterTables.Any(c => string.Compare(c, target.SchemaObject.BaseIdentifier.Value, IsIgnoreCase) == 0))
                 {
                     messages.addMessage(Code.T0000046, updateStatement, target.SchemaObject.BaseIdentifier.Value);
                 }
@@ -250,8 +286,7 @@ namespace SqlCheck
                 if (item is SchemaObjectName)
                 {
                     string table = getNameIdentifiers((item as SchemaObjectName));
-                    var compare = compareNull.SingleOrDefault(c => string.Compare(c.Key, table, true) == 0);
-                    if (compare.Key == null)
+                    if (!compareNull.ContainsKey(table))
                     {
                         messages.addMessage(Code.T0000044, dropTableStatement, table);
                     }
@@ -312,7 +347,7 @@ namespace SqlCheck
             if (statement.InsertSpecification.Target is NamedTableReference)
             {
                 var Target = statement.InsertSpecification.Target as NamedTableReference;
-                CheckeTableReference(Target,false);
+                CheckeTableReference(Target, false);
                 target = getNameTable(Target);
                 if (!IsTempTable(target))
                 {
@@ -368,7 +403,7 @@ namespace SqlCheck
                             }
                             if (expression is ColumnReferenceExpression)
                             {
-
+                                //checkedColumnReference(expression as ColumnReferenceExpression);
                             }
                             if (expression is VariableReference)
                             {
@@ -588,9 +623,8 @@ namespace SqlCheck
             }
             myTable = GetObjectFromServer(tableReference) as MyTable;
             return myTable;
-
         }
-        void CheckeTableReference(TableReference tableReference,bool isAdd = true)
+        void CheckeTableReference(TableReference tableReference, bool isAdd = true)
         {
             if (tableReference is QualifiedJoin)
             {
@@ -614,13 +648,16 @@ namespace SqlCheck
                 {
                     ////
                 }
-                if(isAdd)
+                if (isAdd)
                     AddTable(tableReference);
             }
             if (tableReference is VariableTableReference)
             {
                 //проверить результат
                 getDeclareTableVariable(tableReference as VariableTableReference);
+
+                if (isAdd)
+                    AddTable(tableReference);
             }
             if (tableReference is QueryDerivedTable)
             {
@@ -663,18 +700,15 @@ namespace SqlCheck
         }
         CreateTableStatement GetTableFromCreate(string table)
         {
-            var val = tempTeble.SingleOrDefault(c => string.Compare(table, c.Key, true) == 0);
-            if (val.Key != null)
+            if (tempTeble.ContainsKey(table))
             {
-                val.Value.Count++;
-                return val.Value.Obj;
+                tempTeble[table].Count++;
+                return tempTeble[table].Obj;
             }
-            var val1 = createTebles.SingleOrDefault(c => string.Compare(table, c.Key, true) == 0);
-
-            if (val1.Key != null)
+            if (createTebles.ContainsKey(table))
             {
-                val1.Value.Count++;
-                return val1.Value.Obj;
+                createTebles[table].Count++;
+                return createTebles[table].Obj;
             }
             return null;
         }
@@ -800,6 +834,29 @@ namespace SqlCheck
                         }
                     }
                 }
+                if (table is VariableTableReference)
+                {
+                    DeclareTableVariableBody myTable = getDeclareTableVariable(table as VariableTableReference);
+                    if (myTable != null)
+                    {
+                        foreach (var col in myTable.Definition.ColumnDefinitions)
+                        {
+                            if (col is ColumnDefinition)
+                            {
+                                var c = col as ColumnDefinition;
+                                if (string.Compare(c.ColumnIdentifier.Value, columnName, IsIgnoreCase) == 0)
+                                {
+                                    column = new MyColumn(c);
+                                    break;
+                                }
+                            }
+                        }
+                        if (column == null)
+                        {
+                            messages.addMessage(Code.T0000029, table, (table as VariableTableReference).Variable.Name, columnName);
+                        }
+                    }
+                }
             }
             else
             {
@@ -905,7 +962,7 @@ namespace SqlCheck
             {
                 foreach (var column in table.Value.Obj.Definition.ColumnDefinitions)
                 {
-                    if (string.Compare(myColumn.Name, column.ColumnIdentifier.Value, true) == 0)
+                    if (string.Compare(myColumn.Name, column.ColumnIdentifier.Value, IsIgnoreCase) == 0)
                     {
                         //column.DataType
                         //myColumn.Column.DataType;
@@ -1320,7 +1377,7 @@ namespace SqlCheck
 
                 if (((firstColumn.Alias == null && secondColumn.Alias != null)
                      || (firstColumn.Alias != null && secondColumn.Alias == null))
-                    && string.Compare(firstColumn.Name, secondColumn.Name, true) == 0)
+                    && string.Compare(firstColumn.Name, secondColumn.Name, IsIgnoreCase) == 0)
                 {
                     messages.addMessage(Code.T0000031, search, secondColumn.Name);
                     IsCorrect = false;
@@ -1328,8 +1385,8 @@ namespace SqlCheck
 
                 if (firstColumn.Alias != null && secondColumn.Alias != null)
                 {
-                    if (string.Compare(firstColumn.Alias, secondColumn.Alias, true) == 0
-                    && string.Compare(firstColumn.Name, secondColumn.Name, true) == 0
+                    if (string.Compare(firstColumn.Alias, secondColumn.Alias, IsIgnoreCase) == 0
+                    && string.Compare(firstColumn.Name, secondColumn.Name, IsIgnoreCase) == 0
                     )
                     {
                         messages.addMessage(Code.T0000032, search, firstColumn.Alias);
@@ -1337,7 +1394,7 @@ namespace SqlCheck
                     }
                     else
                     if (firstColumn.Alias != null && secondColumn.Alias != null
-                        && string.Compare(firstColumn.Alias, secondColumn.Alias, true) == 0)
+                        && string.Compare(firstColumn.Alias, secondColumn.Alias, IsIgnoreCase) == 0)
                     {
                         messages.addMessage(Code.T0000025, search, firstColumn.Alias);
                         IsCorrect = false;

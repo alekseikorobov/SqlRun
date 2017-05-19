@@ -1,18 +1,58 @@
-﻿---Проверки существования полей
+﻿---сказать что при update использовать alias из списка from
+
+UPDATE Es
+SET
+	RevenueAllocation = I.Rate,
+	_ModifiedOn = GetDate(),
+	_ModifiedBy = 0
+FROM MARS_EngagementServiceSource I 
+INNER JOIN [Business].Engagement E ON E.Code = I.EngagementCode AND E.FirmID = I.FirmID
+INNER JOIN Business_Service S ON S.Code = I.ServiceCode
+INNER JOIN [Business].EngagementService ES ON ES.EngagementID = E.ID  AND ES.ServiceID = S.ID
+WHERE ES.RevenueAllocation <> I.Rate
+
+------
+
+--DECLARE @t TABLE ( PermissionCode NVARCHAR(MAX)
+--,                  RoleID         int )
+--INSERT INTO @t ( PermissionCode,                    RoleID )
+--VALUES         ( 'Audit.DPP.ReportingGroup.Member', 20     )
+--,              ( 'Audit.DPP.Administrator',         16     )
+--
+--INSERT INTO Security_FirmUserPermission ( UserID, FirmID, PermissionID, _Container, _CreatedOn, _CreatedBy, _ModifiedOn, _ModifiedBy )
+--SELECT sur.UserID
+--,      1
+--,      sp.ID
+--,      'Security.FirmUserPermission'
+--,      GETDATE()
+--,      0
+--,      GETDATE()
+--,      0
+--, t.t
+--FROM      Security_FirmPermission     AS sfp
+--JOIN      Security_Permission         AS sp  ON sp.ID = sfp.ID
+--JOIN      @t                             t   ON t.PermissionCode = sp.Code
+--JOIN      Security_User_Role          AS sur ON t.RoleID=sur.RoleID
+--LEFT JOIN Security_FirmUserPermission    sf  ON sf.UserID =sur.UserID AND sf.PermissionID = sp.ID AND sf.FirmID = 1
+--WHERE sf.ID IS NULL
 
 
-if Exists(select 1 from sys.columns where object_id = object_id('audit_dpp_DeliverableProcessingRequest','U') and name = 'EngagementID')
-begin
-	ALTER TABLE [audit_dpp_DeliverableProcessingRequest] DROP COLUMN EngagementID
-end
 
-if not Exists(select 1 from sys.columns where object_id = object_id('audit_dpp_DeliverableProcessingTaskProfile','U') and name = 'FirmID')
-begin
-	ALTER TABLE audit_dpp_DeliverableProcessingTaskProfile ADD FirmID INT
-end
+---Проверки существования полей
 
-ALTER TABLE [audit_dpp_DeliverableProcessingRequest] DROP COLUMN EngagementID
-ALTER TABLE audit_dpp_DeliverableProcessingTaskProfile ADD FirmID INT
+
+--if Exists(select 1 from sys.columns where object_id = object_id('audit_dpp_DeliverableProcessingRequest','U') and name = 'EngagementID')
+--begin
+--	ALTER TABLE [audit_dpp_DeliverableProcessingRequest] DROP COLUMN EngagementID
+--end
+--
+--if not Exists(select 1 from sys.columns where object_id = object_id('audit_dpp_DeliverableProcessingTaskProfile','U') and name = 'FirmID')
+--begin
+--	ALTER TABLE audit_dpp_DeliverableProcessingTaskProfile ADD FirmID INT
+--end
+
+--ALTER TABLE [audit_dpp_DeliverableProcessingRequest] DROP COLUMN EngagementID
+--ALTER TABLE audit_dpp_DeliverableProcessingTaskProfile ADD FirmID INT
 
 
 --ALTER PROCEDURE [dbo].[Audit_DPP_Deliverables] ( @login NVARCHAR(60))
