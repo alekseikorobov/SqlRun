@@ -43,7 +43,7 @@ namespace SqlCheck
                 }
             }
         }
-
+        public MyTable MyTable { get; set; }
         public string FullName
         {
             get

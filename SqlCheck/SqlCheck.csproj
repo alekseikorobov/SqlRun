@@ -91,6 +91,7 @@
     <Compile Include="Parser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReferCount.cs" />
+    <Compile Include="SelectRegular.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config">

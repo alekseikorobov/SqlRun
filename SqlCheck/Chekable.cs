@@ -1162,7 +1162,6 @@ namespace SqlCheck
                         CheckedSearchedCase(expression as SearchedCaseExpression, true);
                     }
                 }
-
             }
             if (Query.FromClause != null)
             {

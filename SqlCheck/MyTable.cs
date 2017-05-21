@@ -23,8 +23,9 @@ namespace SqlCheck
         string name;
         public string Name { get { return name; } set { name = value; IsExists = true; } }
         public List<MyColumn> Columns { get; set; }
-
         public TableReference TableReference { get; set; }
+        public string Alias { get; set; }
+
 
         internal void AddColumns(ColumnDefinition column)
         {
