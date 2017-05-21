@@ -14,6 +14,10 @@ namespace SqlCheck
 
         private DataTypeReference DataType { get; set; }
 
+        public MyColumn()
+        {
+
+        }
         public MyColumn(Column column)
         {
             this.IsNullable = column != null ? column.Nullable : true;
@@ -52,5 +56,6 @@ namespace SqlCheck
         public string Name { get; set; }
         public bool IsValid { get; internal set; }
         public bool IsNullable { get; internal set; }
+        public ColumnReferenceExpression Expression { get; internal set; }
     }
 }

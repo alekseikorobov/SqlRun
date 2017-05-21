@@ -24,7 +24,9 @@ namespace SqlRun
                 "-t",
                 "-n",
                 "-p",
-                @"script.sql"
+                //@"c:\Users\akorobov\Documents\sql scripts\Business.Audit_Opportunities.StoredProcedure.sql"
+                //@"c:\Users\akorobov\Documents\sql scripts\"
+                @"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
             };
 #endif
             bool IsDirectory = true;
@@ -207,8 +209,8 @@ namespace SqlRun
                 Console.WriteLine("file - {0}", file);
 
                 var messages = parser.ParserFile(file);
-
-                foreach (var message in messages.Where(c => c.Text.IsDesable).OrderBy(c => c.StartLine))
+                var list = messages.Where(c => c.Text.IsDesable).OrderBy(c => c.StartLine);
+                foreach (var message in list)
                 {
                     switch (message.Text.Type)
                     {
@@ -227,6 +229,18 @@ namespace SqlRun
                     Console.WriteLine(message.MessageInformation);
                     Console.ResetColor();
                 }
+                if (messages.Any())
+                {
+                    File.AppendAllLines("result.txt", new[] { file });
+                    File.AppendAllLines("result.txt", list.Select(c => c.MessageInformation));
+                }
+                if (parser.ListNotCheckable.Any())
+                {
+                    File.AppendAllLines("notChek.txt", new[] { file });
+                    File.AppendAllLines("notChek.txt", parser.ListNotCheckable.Select(c => c.Key + "\t" + c.Value.Count + "\t" + c.Value.Obj));
+                    parser.ListNotCheckable.Clear();
+                }
+
                 if (!options.IsTest)
                 {
                     if (messages.Any())

@@ -13,7 +13,7 @@ namespace SqlCheck
             Obj = obj;
             Count = count;
         }
-        public T1 Obj { get; }
+        public T1 Obj { get; set; }
         public T2 Count { get; set; }
     }
 }

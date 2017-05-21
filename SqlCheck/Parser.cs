@@ -65,7 +65,7 @@ namespace SqlCheck
                     foreach (ParseError error in errors)
                     {
                         sb.AppendFormat("{0} {1}\r\n", error.Message, error.Line);
-                        chekable.messages.addMessage(Code.T0000006,null, error.Message, error.Line.ToString());
+                        chekable.messages.addMessage(Code.T0000006, null, error.Message, error.Line.ToString());
                     }
                     //Console.WriteLine(sb.ToString());
                     //Console.ResetColor();
@@ -122,7 +122,8 @@ namespace SqlCheck
             }
             return chekable.messages.Messages;
         }
-
+        public Dictionary<string, ReferCount<string, int>> ListNotCheckable =
+            new Dictionary<string, ReferCount<string, int>>();
         private void CheckStatment(string path, IList<TSqlStatement> statements)
         {
             foreach (var statement in statements)
@@ -144,7 +145,7 @@ namespace SqlCheck
                     chekable.getAlterTableAddTableElementStatement(statement as AlterTableAddTableElementStatement);
                 }
                 else
-                if(statement is UpdateStatement)
+                if (statement is UpdateStatement)
                 {
                     chekable.getUpdateStatement(statement as UpdateStatement);
                 }
@@ -178,7 +179,7 @@ namespace SqlCheck
                 if (statement is IfStatement)
                 {
                     var ifStatement = statement as IfStatement;
-                    
+
                     if (ifStatement.Predicate is BooleanExpression)
                     {
                         chekable.checkedBooleanComparison(ifStatement.Predicate as BooleanExpression);
@@ -187,7 +188,8 @@ namespace SqlCheck
                     CheckStatment(path, new[] { ifStatement.ThenStatement });
                     chekable.clearObjectFromStatement();
                     CheckStatment(path, new[] { ifStatement.ElseStatement });
-                    chekable.clearObjectFromStatement();
+                    //chekable.clearObjectFromStatement();
+                    chekable.ClearPorsProc();
                 }
                 else
                 if (statement is BeginEndBlockStatement)
@@ -233,6 +235,46 @@ namespace SqlCheck
                 {
                     chekable.getDropTableStatement(statement as DropTableStatement);
                 }
+
+                //пропустить
+                else if (statement is PredicateSetStatement) { }
+                else if (statement is PrintStatement) { }
+                else if (statement is GoToStatement) { }
+                else if (statement is AlterTableConstraintModificationStatement) { }
+                else if (statement is SetTransactionIsolationLevelStatement) { }
+                else if (statement is RaiseErrorStatement) { }
+                else if (statement is LabelStatement) { }
+                //курсоры пока тоже пропустить
+                else if (statement is DeclareCursorStatement) { }
+                else if (statement is FetchCursorStatement) { }
+                else if (statement is OpenCursorStatement) { }
+                else if (statement is DeallocateCursorStatement) { }
+                else if (statement is CloseCursorStatement) { }
+                //обработать
+                else if (statement is CommitTransactionStatement) { }
+                else if (statement is BeginTransactionStatement) { }
+                else if (statement is RollbackTransactionStatement) { }
+
+                else if (statement is DeleteStatement) { }
+                else if (statement is ExecuteStatement) { }
+                else if (statement is MergeStatement) { }
+                else if (statement is ReturnStatement) { }
+                else if (statement is SetIdentityInsertStatement) { }
+                else if (statement is TruncateTableStatement) { }
+                else if (statement is TryCatchStatement) { }
+
+                else
+                {
+                    var nameStat = $"{statement.GetType().Name}";
+
+                    if (ListNotCheckable.ContainsKey(nameStat))
+                    {
+                        ListNotCheckable[nameStat].Count++;
+                        ListNotCheckable[nameStat].Obj += "; " + statement.StartLine.ToString();
+                    }
+                    else
+                        ListNotCheckable.Add(nameStat, new ReferCount<string, int>(statement.StartLine.ToString(), 1));
+                }
                 //else
                 //{
                 //    SaveToFile(path, statement);
@@ -242,7 +284,7 @@ namespace SqlCheck
             }
         }
 
-        
+
 
         private void SaveToFileParseError(string path, string v)
         {

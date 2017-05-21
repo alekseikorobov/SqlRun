@@ -347,7 +347,7 @@ namespace SqlCheck
             if (statement.InsertSpecification.Target is NamedTableReference)
             {
                 var Target = statement.InsertSpecification.Target as NamedTableReference;
-                CheckeTableReference(Target, false);
+                CheckeTableReference(Target, null, false);
                 target = getNameTable(Target);
                 if (!IsTempTable(target))
                 {
@@ -433,16 +433,18 @@ namespace SqlCheck
             var setResult = new SetVariableStatement();
 
             var var = getDeclare(set.Variable);
-
-            if (set.Expression is BinaryExpression)
+            if (var != null)
             {
-                set.Expression = calculateExpression(set.Expression as BinaryExpression);
+                if (set.Expression is BinaryExpression)
+                {
+                    set.Expression = calculateExpression(set.Expression as BinaryExpression);
+                }
+                setResult.Expression = convertExpression(set.Expression);
+
+                var.Value = setResult.Expression;
+
+                StringChecked(var);
             }
-            setResult.Expression = convertExpression(set.Expression);
-
-            var.Value = setResult.Expression;
-
-            StringChecked(var);
         }
         public void getDeclareVariableStatement(DeclareVariableStatement dec)
         {
@@ -463,8 +465,16 @@ namespace SqlCheck
             {
                 foreach (var item in select.WithCtesAndXmlNamespaces.CommonTableExpressions)
                 {
-                    GetQuerySpecification(item.QueryExpression as QuerySpecification, IsAddTableList: false);
-                    addWithTable(item);
+                    if (item.QueryExpression is BinaryQueryExpression)
+                    {
+#warning нужна рекурсия
+                        //GetQuerySpecification(item.QueryExpression as QuerySpecification, IsAddTableList: false);
+                    }
+                    if (item.QueryExpression is QuerySpecification)
+                    {
+                        GetQuerySpecification(item.QueryExpression as QuerySpecification, IsAddTableList: false);
+                        addWithTable(item);
+                    }
                 }
             }
             if (select.QueryExpression != null && select.QueryExpression is QuerySpecification)
@@ -495,9 +505,13 @@ namespace SqlCheck
             IsAliasAll = true;
             tables.Clear();
             withTables.Clear();
-            parametrs.Clear();
+
             compareNull.Clear();
             dropTebles.Clear();
+        }
+        public void ClearPorsProc()
+        {
+            parametrs.Clear();
         }
         public void clearObjectFromFile()
         {
@@ -565,17 +579,91 @@ namespace SqlCheck
             CheckUsingVariable();
             CheckUsingParams();
         }
-        public bool checkedBooleanComparison(BooleanExpression booleanExpression)
+        public bool checkedBooleanComparison(BooleanExpression booleanExpression, bool isFromSelect = false)
         {
             if (booleanExpression is BooleanBinaryExpression)
             {
-                bool IsFirst = checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).FirstExpression);
-                bool Second = checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).SecondExpression);
+                bool IsFirst = checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).FirstExpression, isFromSelect);
+                bool Second = checkedBooleanComparison((booleanExpression as BooleanBinaryExpression).SecondExpression, isFromSelect);
                 return IsFirst && Second;
+            }
+            if (booleanExpression is BooleanTernaryExpression)
+            {
+                var ter = booleanExpression as BooleanTernaryExpression;
+
+                if (ter.FirstExpression is ColumnReferenceExpression)
+                {
+                    if (isFromSelect)
+                    {
+                        listColumnsAdd(getColumnReference(ter.FirstExpression as ColumnReferenceExpression));
+                    }
+                    else
+                    {
+                        checkedColumnReference(ter.FirstExpression as ColumnReferenceExpression);
+                    }
+                }
+                if (ter.FirstExpression is VariableReference)
+                {
+                    getDeclare(ter.FirstExpression as VariableReference);
+                }
+                if (ter.SecondExpression is ColumnReferenceExpression)
+                {
+                    if (isFromSelect)
+                    {
+                        listColumnsAdd(getColumnReference(ter.SecondExpression as ColumnReferenceExpression));
+                    }
+                    else
+                        checkedColumnReference(ter.SecondExpression as ColumnReferenceExpression);
+                }
+                if (ter.SecondExpression is VariableReference)
+                {
+                    getDeclare(ter.SecondExpression as VariableReference);
+                }
+                if (ter.ThirdExpression is BinaryExpression)
+                {
+                    var scal = ter.ThirdExpression as BinaryExpression;
+                    if (scal.FirstExpression is VariableReference)
+                    {
+                        getDeclare(scal.FirstExpression as VariableReference);
+                    }
+                    if (scal.SecondExpression is VariableReference)
+                    {
+                        getDeclare(scal.SecondExpression as VariableReference);
+                    }
+                    if (scal.FirstExpression is ColumnReferenceExpression)
+                    {
+                        if (isFromSelect)
+                        {
+                            listColumnsAdd(getColumnReference(ter.FirstExpression as ColumnReferenceExpression));
+                        }
+                        else
+                            checkedColumnReference(scal.FirstExpression as ColumnReferenceExpression);
+                    }
+                    if (scal.SecondExpression is ColumnReferenceExpression)
+                    {
+                        if (isFromSelect)
+                        {
+                            listColumnsAdd(getColumnReference(ter.SecondExpression as ColumnReferenceExpression));
+                        }
+                        else
+                            checkedColumnReference(ter.SecondExpression as ColumnReferenceExpression);
+                    }
+                }
+
+                //bool Th = checkedBooleanComparison(ter.ThirdExpression);
+
+                //if (ter.ThirdExpression is BooleanBinaryExpression)
+                //{
+                //    bool IsFirst1 = checkedBooleanComparison((ter.ThirdExpression as BinaryExpression).FirstExpression);
+                //    bool Second2 = checkedBooleanComparison( (ter.ThirdExpression as BooleanBinaryExpression).SecondExpression);
+                //}
+
+                //    bool IsFirst = checkedBooleanComparison(ter.FirstExpression);
+                //bool Second = checkedBooleanComparison(ter.SecondExpression);
             }
             if (booleanExpression is BooleanComparisonExpression)
             {
-                return checkedBooleanComparisonExpression(booleanExpression as BooleanComparisonExpression);
+                return checkedBooleanComparisonExpression(booleanExpression as BooleanComparisonExpression, isFromSelect);
             }
             if (booleanExpression is BooleanIsNullExpression)
             {
@@ -589,11 +677,24 @@ namespace SqlCheck
             {
                 if ((booleanExpression as InPredicate).Expression is ColumnReferenceExpression)
                 {
-                    checkedColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression);
+                    if (isFromSelect)
+                    {
+                        listColumnsAdd(getColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression));
+                    }
+                    else
+                        checkedColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression);
                 }
                 if ((booleanExpression as InPredicate).Subquery is ScalarSubquery)
                 {
                     GetScalarSubquery((booleanExpression as InPredicate).Subquery as ScalarSubquery);
+                }
+            }
+            if (booleanExpression is BooleanParenthesisExpression)
+            {
+                var par = booleanExpression as BooleanParenthesisExpression;
+                if (par.Expression is BooleanBinaryExpression)
+                {
+                    checkedBooleanComparison(par.Expression, isFromSelect);
                 }
             }
             return true;
@@ -624,21 +725,37 @@ namespace SqlCheck
             myTable = GetObjectFromServer(tableReference) as MyTable;
             return myTable;
         }
-        void CheckeTableReference(TableReference tableReference, bool isAdd = true)
+        void CheckeTableReference(TableReference tableReference, List<MyTable> myTableList = null, bool isAdd = true)
         {
-            if (tableReference is QualifiedJoin)
+            if (tableReference is JoinTableReference)
             {
-                var join = tableReference as QualifiedJoin;
+                var join = tableReference as JoinTableReference;
                 //bool IsFirst = 
-                CheckeTableReference(join.FirstTableReference);
+                CheckeTableReference(join.FirstTableReference, myTableList);
                 //bool Second = 
-                CheckeTableReference(join.SecondTableReference);
+                CheckeTableReference(join.SecondTableReference, myTableList);
                 //bool isCompare = 
-                checkedBooleanComparison(join.SearchCondition);
+                if (tableReference is QualifiedJoin)
+                    checkedBooleanComparison((join as QualifiedJoin).SearchCondition);
                 //return isCompare && IsFirst && Second;
             }
+            else
             if (tableReference is NamedTableReference)
             {
+                if ((tableReference as NamedTableReference).Alias != null)
+                {
+                    var alias = (tableReference as NamedTableReference).Alias?.Value;
+                    if (alias != null)
+                    {
+                        for (int i = 0; i < listColumns.Count; i++)
+                        {
+                            if (listColumns[i].Alias != null && string.Compare(listColumns[i].Alias, alias, IsIgnoreCase) == 0)
+                            {
+                                listColumns.RemoveAt(i--);
+                            }
+                        }
+                    }
+                }
                 //проверить результат
                 if (IsTempTable((tableReference as NamedTableReference).SchemaObject.BaseIdentifier.Value))
                 {
@@ -649,8 +766,23 @@ namespace SqlCheck
                     ////
                 }
                 if (isAdd)
-                    AddTable(tableReference);
+                {
+                    if (myTableList != null)
+                    {
+                        string key = getAliasOrNameTable(tableReference);
+                        myTableList.Add(new MyTable()
+                        {
+                            Name = key,
+                            TableReference = tableReference
+                        });
+                    }
+                    else
+                    {
+                        AddTable(tableReference);
+                    }
+                }
             }
+            else
             if (tableReference is VariableTableReference)
             {
                 //проверить результат
@@ -659,6 +791,7 @@ namespace SqlCheck
                 if (isAdd)
                     AddTable(tableReference);
             }
+            else
             if (tableReference is QueryDerivedTable)
             {
                 var query = tableReference as QueryDerivedTable;
@@ -666,8 +799,16 @@ namespace SqlCheck
                 derivedTables.Push(new List<MyTable>() { new MyTable(lastderivedTable) });
                 ///пока не понятно когда очищать этот список
 
-                GetQuerySpecification(query.QueryExpression as QuerySpecification, derivedTables.Peek());
+                if (query.QueryExpression is BinaryQueryExpression)
+                {
+#warning нужна рекурсия
+                }
+                if (query.QueryExpression is QuerySpecification)
+                {
+                    GetQuerySpecification(query.QueryExpression as QuerySpecification, derivedTables.Peek());
+                }
             }
+            else
             if (tableReference is SchemaObjectFunctionTableReference)
             {
                 var t = tableReference as SchemaObjectFunctionTableReference;
@@ -755,6 +896,10 @@ namespace SqlCheck
             {
                 var named = table as NamedTableReference;
                 return getNameIdentifiers(named.SchemaObject);
+            }
+            if (table is VariableTableReference)
+            {
+                return (table as VariableTableReference).Variable.Name;
             }
             return null;
         }
@@ -929,19 +1074,27 @@ namespace SqlCheck
             }
             return column;
         }
-        MyColumn checkedColumnReference(ColumnReferenceExpression Expression)
+        MyColumn getColumnReference(ColumnReferenceExpression Expression)
         {
-            var column = new MyColumn((Column)null);
+            var column = new MyColumn();
+
             var Identifiers = Expression.MultiPartIdentifier.Identifiers;
             column.Alias = Identifiers.Count > 1 ? Identifiers[Identifiers.Count - 2].Value : null;
             column.Name = Identifiers[Identifiers.Count - 1].Value;
 
-            column.IsValid = !(Identifiers.Count > 2);
+            column.Expression = Expression;
 
+            column.IsValid = !(Identifiers.Count > 2);
             if (!column.IsValid)
             {
                 messages.addMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
             }
+
+            return column;
+        }
+        MyColumn checkedColumnReference(ColumnReferenceExpression Expression)
+        {
+            var column = getColumnReference(Expression);
             if (IsAliasAll && column.Alias == null)
             {
                 messages.addMessage(Code.T0000019, Expression, column.Name);
@@ -986,14 +1139,37 @@ namespace SqlCheck
             }
         }
         #endregion
+        List<MyColumn> listColumns = new List<MyColumn>();
         void GetQuerySpecification(QuerySpecification Query, List<MyTable> myTableList = null, bool IsAddTableList = true)
         {
+            foreach (var element in Query.SelectElements)
+            {
+                if (element is SelectScalarExpression)
+                {
+                    var expression = (element as SelectScalarExpression).Expression;
+                    if (expression is ColumnReferenceExpression)
+                    {
+                        listColumnsAdd(getColumnReference(expression as ColumnReferenceExpression));                        
+                    }
+                    else
+                    if (expression is FunctionCall)
+                    {
+                        getResultFunctionCall(expression as FunctionCall);
+                    }
+                    else
+                    if (expression is SearchedCaseExpression)
+                    {
+                        CheckedSearchedCase(expression as SearchedCaseExpression, true);
+                    }
+                }
+
+            }
             if (Query.FromClause != null)
             {
                 var from = Query.FromClause as FromClause;
                 foreach (TableReference tableReference in from.TableReferences)
                 {
-                    CheckeTableReference(tableReference);
+                    CheckeTableReference(tableReference, myTableList);
                 }
             }
             if (Query.OrderByClause != null)
@@ -1006,40 +1182,96 @@ namespace SqlCheck
                     }
                 }
             }
-            foreach (var element in Query.SelectElements)
-            {
-                if (element is SelectScalarExpression)
-                {
-                    var expression = element as SelectScalarExpression;
-                    if (expression.Expression is VariableReference)
-                    {
-                        getDeclare(expression.Expression as VariableReference);
-                    }
-                    if (expression.Expression is ColumnReferenceExpression)
-                    {
-                        var myColumn = checkedColumnReference(expression.Expression as ColumnReferenceExpression);
-                        if (myTableList != null)
-                        {
-                            var lastTable = myTableList.Single(c => c.Name == lastderivedTable);
-                            if (expression.ColumnName != null)
-                            {
-                                myColumn.Name = expression.ColumnName.Value;
-                            }
-                            lastTable.AddColumns(myColumn);
-                        }
-                    }
-                    if (expression.Expression is FunctionCall)
-                    {
-                        getResultFunctionCall(expression.Expression as FunctionCall);
+            //foreach (var element in Query.SelectElements)
+            //{
+            //    if (element is SelectScalarExpression)
+            //    {
+            //        var expression = element as SelectScalarExpression;
+            //        if (expression.Expression is VariableReference)
+            //        {
+            //            getDeclare(expression.Expression as VariableReference);
+            //        }
+            //        else
+            //        if (expression.Expression is ColumnReferenceExpression)
+            //        {
+            //            var myColumn = checkedColumnReference(expression.Expression as ColumnReferenceExpression);
 
-                    }
-                }
-            }
+            //            if (myTableList != null)
+            //            {
+            //                var lastTable = myTableList.SingleOrDefault(c => string.Compare(c.Name, lastderivedTable, IsIgnoreCase) == 0);
+            //                if (lastTable != null)
+            //                {
+            //                    if (expression.ColumnName != null)
+            //                    {
+            //                        myColumn.Name = expression.ColumnName.Value;
+            //                    }
+            //                    lastTable.AddColumns(myColumn);
+            //                }
+            //            }
+            //        }
+            //        else
+            //        if (expression.Expression is FunctionCall)
+            //        {
+            //            getResultFunctionCall(expression.Expression as FunctionCall);
+            //        }
+            //        else
+            //        if (expression.Expression is SearchedCaseExpression)
+            //        {
+            //            CheckedSearchedCase(expression.Expression as SearchedCaseExpression);
+            //        }
+            //    }
+            //}
             if (Query.WhereClause != null)
             {
                 checkedBooleanComparison(Query.WhereClause.SearchCondition);
             }
         }
+
+        private void CheckedSearchedCase(SearchedCaseExpression searched, bool isFromSelect = false)
+        {
+            foreach (SearchedWhenClause when in searched.WhenClauses)
+            {
+                if (when.ThenExpression is UnaryExpression)
+                {
+                    var un = when.ThenExpression as UnaryExpression;
+                    if (un.Expression is Literal)
+                    {
+
+                    }
+                    else if (un.Expression is ColumnReferenceExpression)
+                    {
+                        if (isFromSelect)
+                            listColumnsAdd(getColumnReference(un.Expression as ColumnReferenceExpression));
+                        //checkedColumnReference(un.Expression as ColumnReferenceExpression);
+                    }
+                    else if (un.Expression is VariableReference)
+                    {
+                        getDeclare(un.Expression as VariableReference);
+                    }
+                }
+                if (when.WhenExpression is BooleanExpression)
+                {
+                    checkedBooleanComparison(when.WhenExpression, isFromSelect);
+                }
+            }
+        }
+
+        private void listColumnsAdd(MyColumn myColumn)
+        {
+            foreach (var column in listColumns)
+            {
+                if(column.Alias != null &&
+                    myColumn.Alias != null)
+                {
+                    if(string.Compare(column.FullName,myColumn.FullName) == 0)
+                    {
+
+                        return;
+                    }
+                }
+            }
+        }
+
         void StringChecked(DeclareVariableElement var)
         {
             if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
@@ -1290,7 +1522,9 @@ namespace SqlCheck
                     else
                     if (param is ColumnReferenceExpression)
                     {
-                        var columnex = checkedColumnReference((param as ColumnReferenceExpression));
+                        //var columnex = checkedColumnReference((param as ColumnReferenceExpression));
+
+                        listColumnsAdd(getColumnReference(param as ColumnReferenceExpression));
                     }
                 }
             }
@@ -1361,8 +1595,20 @@ namespace SqlCheck
             }
             return new StringLiteral();
         }
-        bool checkedBooleanComparisonExpression(BooleanComparisonExpression search)
+        bool checkedBooleanComparisonExpression(BooleanComparisonExpression search, bool isFromSelect = false)
         {
+            if (isFromSelect)
+            {
+                if (search.FirstExpression is ColumnReferenceExpression)
+                {
+                    listColumnsAdd(getColumnReference(search.FirstExpression as ColumnReferenceExpression));
+                }
+                if (search.SecondExpression is ColumnReferenceExpression)
+                {
+                    listColumnsAdd(getColumnReference(search.SecondExpression as ColumnReferenceExpression));
+                }
+                return true;
+            }
             bool IsCorrect = true;
             if (search.FirstExpression is ColumnReferenceExpression
                 && search.SecondExpression is ColumnReferenceExpression)
@@ -1409,7 +1655,7 @@ namespace SqlCheck
 
                     if (search.SecondExpression is VariableReference)
                     {
-
+                        getDeclare(search.SecondExpression as VariableReference);
                     }
                     if (search.SecondExpression is Literal)
                     {
@@ -1429,7 +1675,7 @@ namespace SqlCheck
 
                     if (search.FirstExpression is VariableReference)
                     {
-
+                        getDeclare(search.FirstExpression as VariableReference);
                     }
                     if (search.FirstExpression is Literal)
                     {
@@ -1438,7 +1684,14 @@ namespace SqlCheck
                 }
                 else
                 {
-
+                    if (search.FirstExpression is VariableReference)
+                    {
+                        getDeclare(search.FirstExpression as VariableReference);
+                    }
+                    if (search.SecondExpression is VariableReference)
+                    {
+                        getDeclare(search.SecondExpression as VariableReference);
+                    }
                 }
             }
             return IsCorrect;
