@@ -19,6 +19,12 @@ namespace SqlCheck
         {
             Name = name;
         }
+
+        public MyTable(TableReference table)
+        {
+            this.TableReference = table;
+        }
+
         public bool IsExists { get; set; }
         string name;
         public string Name { get { return name; } set { name = value; IsExists = true; } }

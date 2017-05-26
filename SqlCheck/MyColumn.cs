@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
+using SqlCheck.Modele;
 
 namespace SqlCheck
 {
@@ -57,5 +58,7 @@ namespace SqlCheck
         public bool IsValid { get; internal set; }
         public bool IsNullable { get; internal set; }
         public ColumnReferenceExpression Expression { get; internal set; }
+        public Code ErrorCode { get; internal set; }
+        public SelectRegular InnerQuery { get; internal set; }
     }
 }

@@ -479,9 +479,142 @@ namespace SqlCheck
             }
             if (select.QueryExpression != null && select.QueryExpression is QuerySpecification)
             {
-                GetQuerySpecification(select.QueryExpression as QuerySpecification);
+                GetQuerySpecification1(select.QueryExpression as QuerySpecification);
 
+                //GetQuerySpecification(select.QueryExpression as QuerySpecification);
+
+                //SelectRegular s = new SelectRegular(select.QueryExpression as QuerySpecification);
+
+                //foreach (var element in s.MySelectElements)
+                //{
+                //    foreach (var express in element.Expressions)
+                //    {
+                //        if(express is MyColumn)
+                //        {
+                //            var col = (express as MyColumn);
+                //            if(col.MyTable == null)
+                //            {
+                //                //беда нет таблицы но проверять только при условии если есть подключение
+                //            }
+                //        }
+                //    }     
+                //}
             }
+        }
+
+        private void GetQuerySpecification1(QuerySpecification query)
+        {
+            foreach (var element in query.SelectElements)
+            {
+                if (element is SelectScalarExpression)
+                {
+                    var expres = element as SelectScalarExpression;
+                    if (expres.Expression is ColumnReferenceExpression)
+                    {
+                        ChekedColumnReferenceExpression(expres.Expression as ColumnReferenceExpression, query.FromClause);
+                    }
+                    else if (expres.Expression is VariableReference)
+                    {
+                        getDeclare(expres.Expression as VariableReference);
+                    }
+                    else if (expres.Expression is FunctionCall)
+                    {
+                        var func = expres.Expression as FunctionCall;
+
+                        foreach (var param in func.Parameters)
+                        {
+                            if (param is ColumnReferenceExpression)
+                                ChekedColumnReferenceExpression(param as ColumnReferenceExpression, query.FromClause);
+                            if (param is VariableReference)
+                                getDeclare(param as VariableReference);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ChekedColumnReferenceExpression(ColumnReferenceExpression column, FromClause from)
+        {
+            if (from == null)
+            {//есть колонка но нет таблицы
+                return;
+            }
+            if (column.MultiPartIdentifier.Identifiers.Count > 2)
+            {
+                //много
+                return;
+            }
+            if (column.MultiPartIdentifier.Identifiers.Count == 2) //exists alisa
+            {
+                string alias = column.MultiPartIdentifier.Identifiers[0].Value;
+                string name = column.MultiPartIdentifier.Identifiers[1].Value;
+                bool IsValid = false;
+                foreach (var table in from.TableReferences)
+                {
+                    IsValid = CheckColumnFromAlias(alias, name, table);
+                    if (IsValid) break;
+                }
+                if (!IsValid)
+                {
+                    //не нашли, очень плохо
+                }
+            }
+            else
+            {
+                string name = column.MultiPartIdentifier.Identifiers[0].Value;
+                CheckColumnFromName(name, from);
+            }
+        }
+
+        private bool CheckColumnFromAlias(string alias, string name, TableReference table)
+        {
+            if (table is JoinTableReference)
+            {
+                var join = table as JoinTableReference;
+                bool result = false;
+                result = CheckColumnFromAlias(alias, name, join.FirstTableReference);
+                if (result) return result;
+                result = CheckColumnFromAlias(alias, name, join.SecondTableReference);
+                return result;
+                //if (table is QualifiedJoin)
+                //checkedBooleanComparison((join as QualifiedJoin).SearchCondition);
+            }
+            else
+            if (table is NamedTableReference)
+            {
+                var ntable = table as NamedTableReference;
+
+                if (ntable.Alias != null)
+                {
+                    if (ntable.Alias.Value.Eq(alias, IsIgnoreCase))
+                    {
+                        //попытаться получить поле,
+                        return true;
+                    }
+                }
+            }
+            else if (table is QueryDerivedTable)
+            {
+                var query = (table as QueryDerivedTable);
+                if (query.Alias == null)
+                {
+                    //для внутренних таблиц, не может быть без алиас
+                    return false;
+                }
+                else
+                {
+                    if (query.Alias.Value.Eq(alias, IsIgnoreCase))
+                    {
+                        //
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        private void CheckColumnFromName(string alias, FromClause from)
+        {
+
         }
 
         //void checkedSearchCondition(BooleanExpression searchCondition)
@@ -595,7 +728,7 @@ namespace SqlCheck
                 {
                     if (isFromSelect)
                     {
-                        listColumnsAdd(getColumnReference(ter.FirstExpression as ColumnReferenceExpression));
+                        //                        listColumnsAdd(getColumnReference(ter.FirstExpression as ColumnReferenceExpression));
                     }
                     else
                     {
@@ -610,7 +743,7 @@ namespace SqlCheck
                 {
                     if (isFromSelect)
                     {
-                        listColumnsAdd(getColumnReference(ter.SecondExpression as ColumnReferenceExpression));
+                        //                        listColumnsAdd(getColumnReference(ter.SecondExpression as ColumnReferenceExpression));
                     }
                     else
                         checkedColumnReference(ter.SecondExpression as ColumnReferenceExpression);
@@ -634,7 +767,7 @@ namespace SqlCheck
                     {
                         if (isFromSelect)
                         {
-                            listColumnsAdd(getColumnReference(ter.FirstExpression as ColumnReferenceExpression));
+                            //                            listColumnsAdd(getColumnReference(ter.FirstExpression as ColumnReferenceExpression));
                         }
                         else
                             checkedColumnReference(scal.FirstExpression as ColumnReferenceExpression);
@@ -643,7 +776,7 @@ namespace SqlCheck
                     {
                         if (isFromSelect)
                         {
-                            listColumnsAdd(getColumnReference(ter.SecondExpression as ColumnReferenceExpression));
+                            //                            listColumnsAdd(getColumnReference(ter.SecondExpression as ColumnReferenceExpression));
                         }
                         else
                             checkedColumnReference(ter.SecondExpression as ColumnReferenceExpression);
@@ -679,7 +812,7 @@ namespace SqlCheck
                 {
                     if (isFromSelect)
                     {
-                        listColumnsAdd(getColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression));
+                        //                        listColumnsAdd(getColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression));
                     }
                     else
                         checkedColumnReference((booleanExpression as InPredicate).Expression as ColumnReferenceExpression);
@@ -1074,38 +1207,22 @@ namespace SqlCheck
             }
             return column;
         }
-        MyColumn getColumnReference(ColumnReferenceExpression Expression)
-        {
-            var column = new MyColumn();
 
-            var Identifiers = Expression.MultiPartIdentifier.Identifiers;
-            column.Alias = Identifiers.Count > 1 ? Identifiers[Identifiers.Count - 2].Value : null;
-            column.Name = Identifiers[Identifiers.Count - 1].Value;
-
-            column.Expression = Expression;
-
-            column.IsValid = !(Identifiers.Count > 2);
-            if (!column.IsValid)
-            {
-                messages.addMessage(Code.T0000027, Expression, getNameIdentifiers(Expression.MultiPartIdentifier));
-            }
-
-            return column;
-        }
         MyColumn checkedColumnReference(ColumnReferenceExpression Expression)
         {
-            var column = getColumnReference(Expression);
-            if (IsAliasAll && column.Alias == null)
-            {
-                messages.addMessage(Code.T0000019, Expression, column.Name);
-            }
-            //var HasColumnFromCreateTable = findColumnFromLocalTemp(column);
-            //!HasColumnFromCreateTable &&
-            if (column.IsValid)
-            {
-                column.Column = getMyColumn(column.Alias, column.Name, Expression)?.Column;
-            }
-            return column;
+            //            var column = getColumnReference(Expression);
+            //          if (IsAliasAll && column.Alias == null)
+            //          {
+            //              messages.addMessage(Code.T0000019, Expression, column.Name);
+            //          }
+            //          //var HasColumnFromCreateTable = findColumnFromLocalTemp(column);
+            //          //!HasColumnFromCreateTable &&
+            //          if (column.IsValid)
+            //          {
+            //              column.Column = getMyColumn(column.Alias, column.Name, Expression)?.Column;
+            //          }
+            //          return column;
+            return null;
         }
         Stack<List<MyTable>> derivedTables = new Stack<List<MyTable>>();
         string lastderivedTable = "";
@@ -1149,7 +1266,7 @@ namespace SqlCheck
                     var expression = (element as SelectScalarExpression).Expression;
                     if (expression is ColumnReferenceExpression)
                     {
-                        listColumnsAdd(getColumnReference(expression as ColumnReferenceExpression));                        
+                        //                        listColumnsAdd(getColumnReference(expression as ColumnReferenceExpression));                        
                     }
                     else
                     if (expression is FunctionCall)
@@ -1239,8 +1356,8 @@ namespace SqlCheck
                     }
                     else if (un.Expression is ColumnReferenceExpression)
                     {
-                        if (isFromSelect)
-                            listColumnsAdd(getColumnReference(un.Expression as ColumnReferenceExpression));
+                        //                        if (isFromSelect)
+                        //                            listColumnsAdd(getColumnReference(un.Expression as ColumnReferenceExpression));
                         //checkedColumnReference(un.Expression as ColumnReferenceExpression);
                     }
                     else if (un.Expression is VariableReference)
@@ -1259,10 +1376,10 @@ namespace SqlCheck
         {
             foreach (var column in listColumns)
             {
-                if(column.Alias != null &&
+                if (column.Alias != null &&
                     myColumn.Alias != null)
                 {
-                    if(string.Compare(column.FullName,myColumn.FullName) == 0)
+                    if (string.Compare(column.FullName, myColumn.FullName) == 0)
                     {
 
                         return;
@@ -1523,7 +1640,7 @@ namespace SqlCheck
                     {
                         //var columnex = checkedColumnReference((param as ColumnReferenceExpression));
 
-                        listColumnsAdd(getColumnReference(param as ColumnReferenceExpression));
+                        //                        listColumnsAdd(getColumnReference(param as ColumnReferenceExpression));
                     }
                 }
             }
@@ -1600,11 +1717,11 @@ namespace SqlCheck
             {
                 if (search.FirstExpression is ColumnReferenceExpression)
                 {
-                    listColumnsAdd(getColumnReference(search.FirstExpression as ColumnReferenceExpression));
+                    //                    listColumnsAdd(getColumnReference(search.FirstExpression as ColumnReferenceExpression));
                 }
                 if (search.SecondExpression is ColumnReferenceExpression)
                 {
-                    listColumnsAdd(getColumnReference(search.SecondExpression as ColumnReferenceExpression));
+                    //                    listColumnsAdd(getColumnReference(search.SecondExpression as ColumnReferenceExpression));
                 }
                 return true;
             }

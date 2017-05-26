@@ -1,6 +1,28 @@
-﻿---сказать что при update использовать alias из списка from
+﻿--select t.n from (select n=isnull(1,1)) t
+цшер ы 
+select 
+@name
+,name
+,t.name
+,dbo.name(@name1)
+,dbo.name(t.name1)
+,dbo.name(name1)
+,n = dbo.name(name1)
+,n = name
+,n = t.name
+,n = (select @var)
+,n = (select var from tab)
+,n = (select var from #tab)
+,n = case when 1=1 then 1 else 0 end
+from ggg g join (select name from ttt) t on g.id=t.id
 
-UPDATE Es
+select t.name from tab t join tab1 t1 on t.id = t1.id
+--where t.name = 1
+
+
+---сказать что при update использовать alias из списка from
+
+UPDATE Es1
 SET
 	RevenueAllocation = I.Rate,
 	_ModifiedOn = GetDate(),

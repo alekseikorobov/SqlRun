@@ -26,7 +26,8 @@ namespace SqlRun
                 "-p",
                 //@"c:\Users\akorobov\Documents\sql scripts\Business.Audit_Opportunities.StoredProcedure.sql"
                 //@"c:\Users\akorobov\Documents\sql scripts\"
-                @"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
+                //@"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
+                "script.sql"
             };
 #endif
             bool IsDirectory = true;
