@@ -88,6 +88,7 @@
     <Compile Include="MyColumn.cs" />
     <Compile Include="MyObjectFromServer.cs" />
     <Compile Include="MyTable.cs" />
+    <Compile Include="MyType.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReferCount.cs" />

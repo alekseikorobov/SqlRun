@@ -1,37 +1,39 @@
 ﻿--select t.n from (select n=isnull(1,1)) t
-цшер ы 
+
 select 
-@name
-,name
-,t.name
-,dbo.name(@name1)
-,dbo.name(t.name1)
-,dbo.name(name1)
-,n = dbo.name(name1)
-,n = name
-,n = t.name
-,n = (select @var)
-,n = (select var from tab)
-,n = (select var from #tab)
-,n = case when 1=1 then 1 else 0 end
+--@name
+--,name
+--,t.name
+--,dbo.name(@name1)
+--,dbo.name(t.name1)
+--,dbo.name(name1)
+--,n = dbo.name(name1)
+--,n = name
+--,n = t.name
+--,n = (select @var)
+--,n = (select var from tab)
+n = (select var from #tab)
+--,n = case when 1=1 then 1 else 0 end
+--,n = case when @ttt=1 and 4=5 then @ttt_1 else @ttt_0 end
+--,n = case @ttt when 1 then @ttt_1 else @ttt_0 end
 from ggg g join (select name from ttt) t on g.id=t.id
 
-select t.name from tab t join tab1 t1 on t.id = t1.id
+--select t.name from tab t join tab1 t1 on t.id = t1.id
 --where t.name = 1
 
 
 ---сказать что при update использовать alias из списка from
 
-UPDATE Es1
-SET
-	RevenueAllocation = I.Rate,
-	_ModifiedOn = GetDate(),
-	_ModifiedBy = 0
-FROM MARS_EngagementServiceSource I 
-INNER JOIN [Business].Engagement E ON E.Code = I.EngagementCode AND E.FirmID = I.FirmID
-INNER JOIN Business_Service S ON S.Code = I.ServiceCode
-INNER JOIN [Business].EngagementService ES ON ES.EngagementID = E.ID  AND ES.ServiceID = S.ID
-WHERE ES.RevenueAllocation <> I.Rate
+--UPDATE Es1
+--SET
+--	RevenueAllocation = I.Rate,
+--	_ModifiedOn = GetDate(),
+--	_ModifiedBy = 0
+--FROM MARS_EngagementServiceSource I 
+--INNER JOIN [Business].Engagement E ON E.Code = I.EngagementCode AND E.FirmID = I.FirmID
+--INNER JOIN Business_Service S ON S.Code = I.ServiceCode
+--INNER JOIN [Business].EngagementService ES ON ES.EngagementID = E.ID  AND ES.ServiceID = S.ID
+--WHERE ES.RevenueAllocation <> I.Rate
 
 ------
 

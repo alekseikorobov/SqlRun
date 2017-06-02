@@ -12,6 +12,7 @@ namespace SqlCheck
     {
         public MyTable()
         {
+
             IsExists = false;
             Columns = new List<MyColumn>();
         }

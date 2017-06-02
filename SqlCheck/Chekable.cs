@@ -502,31 +502,292 @@ namespace SqlCheck
             }
         }
 
+        void CheckedSelectScalarExpression(ScalarExpression Expression, IdentifierOrValueExpression ColumnName, QuerySpecification query)
+        {
+            if (Expression is ColumnReferenceExpression)
+            {
+                ChekedColumnReferenceExpression(Expression as ColumnReferenceExpression, query.FromClause);
+            }
+            else if (Expression is VariableReference)
+            {
+                getDeclare(Expression as VariableReference);
+            }
+            else if (Expression is FunctionCall)
+            {
+                var func = Expression as FunctionCall;
+
+                foreach (var param in func.Parameters)
+                {
+                    if (param is ColumnReferenceExpression)
+                        ChekedColumnReferenceExpression(param as ColumnReferenceExpression, query.FromClause);
+                    if (param is VariableReference)
+                        getDeclare(param as VariableReference);
+                }
+            }
+            else if (Expression is ScalarSubquery)
+            {
+                var queryPart = (Expression as ScalarSubquery).QueryExpression as QuerySpecification;
+                if (queryPart.SelectElements.Count > 1)
+                {
+#warning не должно быть такого
+                }
+                else
+                {
+                    if (queryPart.SelectElements[0] is SelectScalarExpression)
+                    {
+                        var elementPart = (queryPart.SelectElements[0] as SelectScalarExpression);
+                        CheckedSelectScalarExpression(elementPart.Expression, elementPart.ColumnName, queryPart);
+                    }
+                    else
+                    {
+#warning неизвестный тип
+                    }
+                }
+                CheckFromCause(queryPart.FromClause);
+            }
+            else if (Expression is SearchedCaseExpression)
+            {
+                var cs = Expression as SearchedCaseExpression;
+                foreach (var when in cs.WhenClauses)
+                {
+                    if (when.WhenExpression is BooleanExpression)
+                    {
+                        CheckBooleanComparisonExpression(when.WhenExpression, query);
+                    }
+
+                    CheckedSelectScalarExpression(when.ThenExpression, null, query);
+                }
+                if (cs.ElseExpression != null)
+                {
+                    CheckedSelectScalarExpression(cs.ElseExpression, null, query);
+                }
+            }
+            if (Expression is SimpleCaseExpression)
+            {
+                var sc = Expression as SimpleCaseExpression;
+
+                CheckedSelectScalarExpression(sc.InputExpression, null, query);
+
+                foreach (SimpleWhenClause when in sc.WhenClauses)
+                {
+                    CheckedSelectScalarExpression(when.WhenExpression, null, query);
+                    CheckedSelectScalarExpression(when.ThenExpression, null, query);
+                }
+                if (sc.ElseExpression != null)
+                {
+                    CheckedSelectScalarExpression(sc.ElseExpression, null, query);
+                }
+            }
+            else
+            {
+#warning неизвестный тип
+            }
+        }
+
+        private void CheckBooleanComparisonExpression(BooleanExpression booleanComparisonExpression, QuerySpecification query)
+        {
+            if (booleanComparisonExpression is BooleanBinaryExpression)
+            {
+                var b = booleanComparisonExpression as BooleanBinaryExpression;
+                CheckBooleanComparisonExpression(b.FirstExpression, query);
+                CheckBooleanComparisonExpression(b.SecondExpression, query);
+            }
+            else if (booleanComparisonExpression is BooleanComparisonExpression)
+            {
+                var b = booleanComparisonExpression as BooleanComparisonExpression;
+
+                if (b.FirstExpression is Literal && b.SecondExpression is Literal)
+                {
+#warning сравнение двух констант
+                }
+
+                CheckedSelectScalarExpression(b.FirstExpression, null, query);
+                CheckedSelectScalarExpression(b.SecondExpression, null, query);
+
+                MyType typeA = GetTypeFromExpression(b.FirstExpression, query);
+                MyType typeB = GetTypeFromExpression(b.SecondExpression, query);
+                CheckComparisonType(typeA, typeB);
+
+            }
+        }
+
+        private void CheckComparisonType(MyType typeA, MyType typeB)
+        {
+            if (typeA.Type != typeB.Type)
+            {
+#warning неявное преобразование или даже возможно не корректное
+            }
+        }
+
+        private MyType GetTypeFromExpression(ScalarExpression firstExpression, QuerySpecification query)
+        {
+            MyType type = new MyType();
+
+            type.Type = LiteralType.Null;
+            type.Length = 10;
+
+            return type;
+        }
+
         private void GetQuerySpecification1(QuerySpecification query)
         {
+            List<string> elementNames = new List<string>();
             foreach (var element in query.SelectElements)
             {
                 if (element is SelectScalarExpression)
                 {
-                    var expres = element as SelectScalarExpression;
-                    if (expres.Expression is ColumnReferenceExpression)
-                    {
-                        ChekedColumnReferenceExpression(expres.Expression as ColumnReferenceExpression, query.FromClause);
-                    }
-                    else if (expres.Expression is VariableReference)
-                    {
-                        getDeclare(expres.Expression as VariableReference);
-                    }
-                    else if (expres.Expression is FunctionCall)
-                    {
-                        var func = expres.Expression as FunctionCall;
+                    //string name = "";
+                    CheckedSelectScalarExpression((element as SelectScalarExpression).Expression, (element as SelectScalarExpression).ColumnName, query);
+                    //elementNames.Add(name);
+                }
+                else
+                {
+#warning неизвестный тип
+                }
+            }
 
-                        foreach (var param in func.Parameters)
+            CheckFromCause(query.FromClause);
+        }
+
+        private void CheckFromCause(FromClause fromClause)
+        {
+            foreach (TableReference tableReference in fromClause.TableReferences)
+            {
+                CheckeTableReference1(tableReference);
+            }
+        }
+        void CheckeTableReference1(TableReference tableReference)
+        {
+            if (tableReference is JoinTableReference)
+            {
+                var join = tableReference as JoinTableReference;
+                CheckeTableReference1(join.FirstTableReference);
+                CheckeTableReference1(join.SecondTableReference);
+                if (tableReference is QualifiedJoin)
+                    checkedBooleanComparison((join as QualifiedJoin).SearchCondition, tableReference);
+            }
+            else
+            if (tableReference is NamedTableReference)
+            {
+                if ((tableReference as NamedTableReference).Alias != null)
+                {
+                    var alias = (tableReference as NamedTableReference).Alias?.Value;
+                }
+                //проверить результат
+                if (IsTempTable((tableReference as NamedTableReference).SchemaObject.BaseIdentifier.Value))
+                {
+                    var table = GetTempTable((tableReference as NamedTableReference).SchemaObject);
+                }
+                else
+                {
+                    //////
+                }
+            }
+            else
+            if (tableReference is VariableTableReference)
+            {
+                //проверить результат
+                getDeclareTableVariable(tableReference as VariableTableReference);
+            }
+            else
+            if (tableReference is QueryDerivedTable)
+            {
+                var query = tableReference as QueryDerivedTable;
+                if (query.QueryExpression is BinaryQueryExpression)
+                {
+#warning нужна рекурсия
+                }
+                if (query.QueryExpression is QuerySpecification)
+                {
+                    GetQuerySpecification1(query.QueryExpression as QuerySpecification);
+                }
+            }
+            else
+            if (tableReference is SchemaObjectFunctionTableReference)
+            {
+                var t = tableReference as SchemaObjectFunctionTableReference;
+
+                if (t.Alias == null)
+                {
+                    IsAliasAll = false;
+                }
+
+                foreach (var param in t.Parameters)
+                {
+                    if (param is VariableReference)
+                    {
+                        var r = getDeclare(param as VariableReference);
+                    }
+                }
+            }
+        }
+
+        private void checkedBooleanComparison(BooleanExpression searchCondition, TableReference tableReference)
+        {
+            if (searchCondition is BooleanComparisonExpression)
+            {
+                var cond = searchCondition as BooleanComparisonExpression;
+                if (cond.FirstExpression is ColumnReferenceExpression)
+                {
+                    CheckColumnFromTable(cond.FirstExpression as ColumnReferenceExpression, tableReference);
+                    CheckColumnFromTable(cond.SecondExpression as ColumnReferenceExpression, tableReference);
+                }
+            }
+
+        }
+
+        private void CheckColumnFromTable(ColumnReferenceExpression columnReferenceExpression, TableReference tableReference)
+        {
+            if (tableReference is JoinTableReference)
+            {
+                var join = tableReference as JoinTableReference;
+                CheckColumnFromTable(columnReferenceExpression, join.FirstTableReference);
+                CheckColumnFromTable(columnReferenceExpression, join.SecondTableReference);
+            }
+            else if (tableReference is QueryDerivedTable)
+            {
+                var query = tableReference as QueryDerivedTable;
+                MyColumn column = getColumnReference(columnReferenceExpression);
+                if (column.Alias != null)
+                {
+                    if (query.Alias.Value.Eq(column.Alias, IsIgnoreCase))
+                    {
+                        if (query.QueryExpression is QuerySpecification)
                         {
-                            if (param is ColumnReferenceExpression)
-                                ChekedColumnReferenceExpression(param as ColumnReferenceExpression, query.FromClause);
-                            if (param is VariableReference)
-                                getDeclare(param as VariableReference);
+                            var q = query.QueryExpression as QuerySpecification;
+                            foreach (var element in q.SelectElements)
+                            {
+                                if (element is SelectScalarExpression)
+                                {
+                                    var field = element as SelectScalarExpression;
+                                    if (field.ColumnName != null)
+                                    {
+                                        if (field.ColumnName.Value.Eq(column.Name))
+                                        {
+                                            return; // ok
+                                        }
+
+                                        if (field.Expression is ColumnReferenceExpression)
+                                        {
+                                            var column1 = field.Expression as ColumnReferenceExpression;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if (field.Expression is ColumnReferenceExpression)
+                                        {
+                                            var col = field.Expression as ColumnReferenceExpression;
+                                            string name = col.MultiPartIdentifier.Identifiers[col.MultiPartIdentifier.Count - 1].Value;
+
+                                            if (name.Eq(column.Name))
+                                            {
+                                                return; //OK
+                                            }
+
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -565,7 +826,6 @@ namespace SqlCheck
                 CheckColumnFromName(name, from);
             }
         }
-
         private bool CheckColumnFromAlias(string alias, string name, TableReference table)
         {
             if (table is JoinTableReference)
@@ -1256,6 +1516,11 @@ namespace SqlCheck
             }
         }
         #endregion
+
+        #region Query
+
+        #endregion
+
         List<MyColumn> listColumns = new List<MyColumn>();
         void GetQuerySpecification(QuerySpecification Query, List<MyTable> myTableList = null, bool IsAddTableList = true)
         {
@@ -1266,7 +1531,7 @@ namespace SqlCheck
                     var expression = (element as SelectScalarExpression).Expression;
                     if (expression is ColumnReferenceExpression)
                     {
-                        //                        listColumnsAdd(getColumnReference(expression as ColumnReferenceExpression));                        
+                        // listColumnsAdd(getColumnReference(expression as ColumnReferenceExpression));                        
                     }
                     else
                     if (expression is FunctionCall)
@@ -1342,7 +1607,6 @@ namespace SqlCheck
                 checkedBooleanComparison(Query.WhereClause.SearchCondition);
             }
         }
-
         private void CheckedSearchedCase(SearchedCaseExpression searched, bool isFromSelect = false)
         {
             foreach (SearchedWhenClause when in searched.WhenClauses)
@@ -1371,7 +1635,6 @@ namespace SqlCheck
                 }
             }
         }
-
         private void listColumnsAdd(MyColumn myColumn)
         {
             foreach (var column in listColumns)
@@ -1387,7 +1650,6 @@ namespace SqlCheck
                 }
             }
         }
-
         void StringChecked(DeclareVariableElement var)
         {
             if (var.Value is StringLiteral && var.DataType is SqlDataTypeReference)
@@ -1675,6 +1937,23 @@ namespace SqlCheck
 
 
             return new StringLiteral();
+        }
+        MyColumn getColumnReference(ColumnReferenceExpression Expression)
+        {
+            var column = new MyColumn();
+
+            var Identifiers = Expression.MultiPartIdentifier.Identifiers;
+            column.Alias = Identifiers.Count > 1 ? Identifiers[Identifiers.Count - 2].Value : null;
+            column.Name = Identifiers[Identifiers.Count - 1].Value;
+
+            column.Expression = Expression;
+
+            column.IsValid = !(Identifiers.Count > 2);
+            if (!column.IsValid)
+            {
+                column.ErrorCode = Code.T0000027;
+            }
+            return column;
         }
         T calculate<T, T1>(BinaryExpression val, Func<string, T1> parse, Func<T1, T1, T1> result)
              where T : Literal, new()
