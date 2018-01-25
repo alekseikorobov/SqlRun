@@ -21,13 +21,11 @@ namespace SqlRun
 #if DEBUG
             args = new[]
             {
-                "-t",
-                "-n",
                 "-p",
                 //@"c:\Users\akorobov\Documents\sql scripts\Business.Audit_Opportunities.StoredProcedure.sql"
                 //@"c:\Users\akorobov\Documents\sql scripts\"
                 //@"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
-                "script.sql"
+                //"script.sql"
             };
 #endif
             bool IsDirectory = true;
@@ -92,7 +90,7 @@ namespace SqlRun
 
                 if (!options.IsTest)
                 {
-                    SqlProvider.InitConection();
+                    SqlProvider.InitConnection();
                 }
 
                 if (IsFromFile)
@@ -208,42 +206,42 @@ namespace SqlRun
             try
             {
                 Console.WriteLine("file - {0}", file);
-
-                var messages = parser.ParserFile(file);
-                var list = messages.Where(c => c.Text.IsDesable).OrderBy(c => c.StartLine);
-                foreach (var message in list)
+                if (options.IsTest)
                 {
-                    switch (message.Text.Type)
+                    var messages = parser.ParserFile(file);
+                    var list = messages.Where(c => c.Text.IsDesable).OrderBy(c => c.StartLine);
+                    foreach (var message in list)
                     {
-                        case TypeMessage.Warning:
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            break;
-                        case TypeMessage.Error:
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            break;
-                        case TypeMessage.Debug:
-                            Console.ForegroundColor = ConsoleColor.Gray;
-                            break;
-                        default:
-                            break;
+                        switch (message.Text.Type)
+                        {
+                            case TypeMessage.Warning:
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                break;
+                            case TypeMessage.Error:
+                                Console.ForegroundColor = ConsoleColor.Red;
+                                break;
+                            case TypeMessage.Debug:
+                                Console.ForegroundColor = ConsoleColor.Gray;
+                                break;
+                            default:
+                                break;
+                        }
+                        Console.WriteLine(message.MessageInformation);
+                        Console.ResetColor();
                     }
-                    Console.WriteLine(message.MessageInformation);
-                    Console.ResetColor();
-                }
-                if (messages.Any())
-                {
-                    File.AppendAllLines("result.txt", new[] { file });
-                    File.AppendAllLines("result.txt", list.Select(c => c.MessageInformation));
-                }
-                if (parser.ListNotCheckable.Any())
-                {
-                    File.AppendAllLines("notChek.txt", new[] { file });
-                    File.AppendAllLines("notChek.txt", parser.ListNotCheckable.Select(c => c.Key + "\t" + c.Value.Count + "\t" + c.Value.Obj));
-                    parser.ListNotCheckable.Clear();
-                }
+                    if (messages.Any())
+                    {
+                        File.AppendAllLines("result.txt", new[] { file });
+                        File.AppendAllLines("result.txt", list.Select(c => c.MessageInformation));
+                    }
+                    if (parser.ListNotCheckable.Any())
+                    {
+                        File.AppendAllLines("notChek.txt", new[] { file });
+                        File.AppendAllLines("notChek.txt", parser.ListNotCheckable.Select(c => c.Key + "\t" + c.Value.Count + "\t" + c.Value.Obj));
+                        parser.ListNotCheckable.Clear();
+                    }
 
-                if (!options.IsTest)
-                {
+
                     if (messages.Any())
                     {
                         isStop = true;
@@ -256,10 +254,11 @@ namespace SqlRun
                 }
                 else
                 {
-                    if (messages.Any())
-                    {
-                        isStop = true;
-                    }
+                    //if (messages.Any())
+                    //{
+                    //    isStop = true;
+                    //}
+                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
                 }
             }
             catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }

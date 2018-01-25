@@ -645,8 +645,8 @@ namespace SqlCheck
 #warning неизвестный тип
                 }
             }
-
-            CheckFromCause(query.FromClause);
+            if (query.FromClause != null)
+                CheckFromCause(query.FromClause);
         }
 
         private void CheckFromCause(FromClause fromClause)
@@ -874,6 +874,11 @@ namespace SqlCheck
         }
         private void CheckColumnFromName(string alias, FromClause from)
         {
+
+            foreach (var tableReferences in from.TableReferences)
+            {
+                //tableReferences.
+            }
 
         }
 
