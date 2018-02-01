@@ -62,6 +62,7 @@ namespace SqlRun
                     if (string.IsNullOrEmpty(sql) || sql.Equals("\r\n") || sql.Equals("\n")) continue;
 
                     _server.CommandText = sql;
+                    _server.CommandTimeout = 0;
                     int count = _server.ExecuteNonQuery();
                     Console.WriteLine("return {0} - {1}", count, (sqlAll.Count > 0 ? " Part - " + i : ""));
                 }

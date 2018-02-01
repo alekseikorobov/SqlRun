@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using CommandLine;
 using System.Data.SqlClient;
+using System.Text;
 using SqlCheck.Modele;
 
 namespace SqlRun
@@ -22,10 +23,12 @@ namespace SqlRun
             args = new[]
             {
                 "-p",
-                //@"c:\Users\akorobov\Documents\sql scripts\Business.Audit_Opportunities.StoredProcedure.sql"
+                @"e:\Projects\ARSystemReview\sql\insert all field where ru.sql"
                 //@"c:\Users\akorobov\Documents\sql scripts\"
                 //@"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
                 //"script.sql"
+                ,"--server", "RUMSKAPD50\\SQL2016"
+                ,"--db","ARSystemReview"
             };
 #endif
             bool IsDirectory = true;
@@ -250,7 +253,7 @@ namespace SqlRun
                         if (res != "y")
                             return;
                     }
-                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
+                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file,Encoding.UTF8));
                 }
                 else
                 {
@@ -258,7 +261,7 @@ namespace SqlRun
                     //{
                     //    isStop = true;
                     //}
-                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file));
+                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file, Encoding.UTF8));
                 }
             }
             catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }

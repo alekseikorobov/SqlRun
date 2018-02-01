@@ -5,3 +5,28 @@ C:\Users\akorobov\Documents\Visual Studio 2015\Projects\SqlRun\SqlRun\bin\Debug\
 C:\Users\akorobov\Documents\Visual Studio 2015\Projects\SqlRun\SqlRun\bin\Debug\CommandLine.xml
 C:\Users\akorobov\Documents\Visual Studio 2015\Projects\SqlRun\SqlRun\obj\Debug\SqlRun.exe
 C:\Users\akorobov\Documents\Visual Studio 2015\Projects\SqlRun\SqlRun\obj\Debug\SqlRun.pdb
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\script.sql
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\SqlRun.exe.config
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\SqlRun.exe
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\SqlRun.pdb
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\CommandLine.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.Data.Schema.ScriptDom.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.ConnectionInfo.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.ConnectionInfoExtended.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.Management.Sdk.Sfc.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.Smo.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.SmoExtended.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.SqlClrProvider.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.SqlEnum.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.TransactSql.ScriptDom.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\SqlCheck.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Newtonsoft.Json.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.Dmf.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.ServiceBrokerEnum.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Microsoft.SqlServer.RegSvrEnum.dll
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\SqlCheck.pdb
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\CommandLine.xml
+E:\MyProject\Code\SqlRun\SqlRun\bin\Debug\Newtonsoft.Json.xml
+E:\MyProject\Code\SqlRun\SqlRun\obj\Debug\SqlRun.csprojResolveAssemblyReference.cache
+E:\MyProject\Code\SqlRun\SqlRun\obj\Debug\SqlRun.exe
+E:\MyProject\Code\SqlRun\SqlRun\obj\Debug\SqlRun.pdb
