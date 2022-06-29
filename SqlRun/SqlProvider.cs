@@ -48,38 +48,62 @@ namespace SqlRun
         //        }
         //    }
         //}
-        public void ExecuteSqlCommand(string script)
+        public void CommandWithTransaction(Action action)
         {
-            string[] sqlLines = script.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-
-            List<string> sqlAll = this.SplitGo(sqlLines);
-
-            for (int i = 0; i < sqlAll.Count; i++)
+            using (var transaction = _server.Connection.BeginTransaction())
             {
-                string sql = sqlAll[i];
-                try
-                {
-                    if (string.IsNullOrEmpty(sql) || sql.Equals("\r\n") || sql.Equals("\n")) continue;
-
-                    _server.CommandText = sql;
-                    _server.CommandTimeout = 0;
-                    int count = _server.ExecuteNonQuery();
-                    Console.WriteLine("return {0} - {1}", count, (sqlAll.Count > 0 ? " Part - " + i : ""));
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"Not correct line '{i}', sql='{sql}'", ex);
-                }
+                _server.Transaction = transaction;
+                Console.WriteLine("__________START TRANSACTION__________");
+                action();
+                transaction.Commit();
+                Console.WriteLine("__________COMMIT TRANSACTION_________");
             }
         }
-        private List<string> SplitGo(IReadOnlyList<string> sqlLines)
+        public void CommandWithoutTransaction(Action action)
         {
+            action();
+        }
+
+        public void ExecuteSqlCommand(string script)
+        {
+            
+
+            List<string> sqlAll = this.SplitGo(script);
+            
+            Action<Action> command = _options.IsTransaction ? this.CommandWithTransaction : (Action<Action>)this.CommandWithoutTransaction;
+            
+            command(() =>
+            {
+                for (int i = 0; i < sqlAll.Count; i++)
+                {
+                    string sql = sqlAll[i];
+                    try
+                    {
+                        if (string.IsNullOrEmpty(sql) || sql.Equals("\r\n") || sql.Equals("\n")) continue;
+
+                        _server.CommandText = sql;
+                        _server.CommandTimeout = 0;
+                        int count = _server.ExecuteNonQuery();
+                        Console.WriteLine("return {0} - {1}", count, (sqlAll.Count > 0 ? " Part - " + i : ""));
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"Not correct line '{i}', sql='{sql}'", ex);
+                    }
+                }
+            });
+
+
+        }
+        private List<string> SplitGo(string script)
+        {
+            string[] sqlLines = script.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             List<string> sqlAll = new List<string>();
             List<int> separatorGo = new List<int>();
             int startIndex = 0;
             int nowIndex = 0;
             int comment = 0;
-            for (int i = 0; i < sqlLines.Count; i++)
+            for (int i = 0; i < sqlLines.Length; i++)
             {
                 string line = sqlLines[i];
                 line = Regex.Replace(line, @"/\*(.*)\*/", "");
@@ -100,7 +124,7 @@ namespace SqlRun
             }
             do
             {
-                int endIndex = separatorGo.Count > nowIndex ? separatorGo[nowIndex] : sqlLines.Count;
+                int endIndex = separatorGo.Count > nowIndex ? separatorGo[nowIndex] : sqlLines.Length;
 
                 StringBuilder sqlPart = new StringBuilder();
 

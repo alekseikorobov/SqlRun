@@ -17,18 +17,20 @@ namespace SqlRun
         static SqlCheck.Parser parser;
         private static bool isStop = false;
 
+
         static void Main(string[] args)
         {
 #if DEBUG
             args = new[]
             {
                 "-p",
-                @"e:\Projects\ARSystemReview\sql\insert all field where ru.sql"
+                @"c:\_work\Batman\Development\RM Additional Role Form\SQL"
                 //@"c:\Users\akorobov\Documents\sql scripts\"
                 //@"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
                 //"script.sql"
-                ,"--server", "RUMSKAPD50\\SQL2016"
-                ,"--db","ARSystemReview"
+                ,"--server", ""
+                ,"--db","KDB_BTMSOnlineDemo_test"
+                ,"-A"
             };
 #endif
             bool IsDirectory = true;
@@ -96,45 +98,52 @@ namespace SqlRun
                     SqlProvider.InitConnection();
                 }
 
+                Action<Action> command = options.IsTransaction ? SqlProvider.CommandWithTransaction : (Action<Action>)SqlProvider.CommandWithoutTransaction;
+
                 if (IsFromFile)
                 {
-                    foreach (var file in File.ReadAllLines(options.File))
+                    command(() =>
                     {
-                        string path = file.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                        if (File.Exists(path))
+                        foreach (var file in File.ReadAllLines(options.File))
                         {
-                            Console.ResetColor();
-                            ActionFile(path);
-                        }
-                        else
-                        {
-                            string Patern = "";
-                            if (Directory.Exists(path))
+                            string path = file.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                            if (File.Exists(path))
                             {
-                                Patern = "*.sql";
+                                Console.ResetColor();
+                                ActionFile(path);
                             }
                             else
                             {
-                                int index = path.LastIndexOf(Path.AltDirectorySeparatorChar);
-                                if (index != -1)
+                                string Patern = "";
+                                if (Directory.Exists(path))
                                 {
-                                    Patern = path.Substring(index);
-                                    path = CleanFileName(path.Substring(0, index));
+                                    Patern = "*.sql";
                                 }
-                                if (!Directory.Exists(path))
+                                else
                                 {
-                                    Console.ForegroundColor = ConsoleColor.Red;
-                                    Console.WriteLine("File {0} not exists", path);
-                                    isStop = true;
-                                    continue;
+                                    int index = path.LastIndexOf(Path.AltDirectorySeparatorChar);
+                                    if (index != -1)
+                                    {
+                                        Patern = path.Substring(index);
+                                        path = CleanFileName(path.Substring(0, index));
+                                    }
+
+                                    if (!Directory.Exists(path))
+                                    {
+                                        Console.ForegroundColor = ConsoleColor.Red;
+                                        Console.WriteLine("File {0} not exists", path);
+                                        isStop = true;
+                                        continue;
+                                    }
                                 }
-                            }
-                            foreach (FileInfo fileInfo in (new DirectoryInfo(path)).GetFiles(Patern))
-                            {
-                                ActionFile(fileInfo.FullName);
+
+                                foreach (FileInfo fileInfo in (new DirectoryInfo(path)).GetFiles(Patern))
+                                {
+                                    ActionFile(fileInfo.FullName);
+                                }
                             }
                         }
-                    }
+                    });
                 }
                 else if (IsDirectory)
                 {
@@ -152,26 +161,37 @@ namespace SqlRun
                         }
                     }
 
-                    foreach (var file in files.OrderBy(c =>
-                     {
-                         int i = int.MaxValue;
-                         if (Regex.IsMatch(c.Name, "^\\d+"))
-                             i = int.Parse(Regex.Match(c.Name, "^\\d+").Value);
-                         return i;
-                     }))
+                    command(() =>
                     {
-                        ActionFile(file.FullName);
-                    }
+                        foreach (var file in files.OrderBy(c =>
+                        {
+                            int i = int.MaxValue;
+                            if (Regex.IsMatch(c.Name, "^\\d+"))
+                                i = int.Parse(Regex.Match(c.Name, "^\\d+").Value);
+                            return i;
+                        }))
+                        {
+                            ActionFile(file.FullName);
+                        }
+                    });
                 }
                 else
                 {
-                    ActionFile(options.Path);
+                    command(() =>
+                    {
+                        ActionFile(options.Path);
+                    });
                 }
             }
             catch (Exception e)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(e.Message);
+                Console.WriteLine("_____Message__________");
+                for (Exception ex = e; ex != null; ex = ex.InnerException)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+                Console.WriteLine("_____END Message______");
                 Console.WriteLine(e.StackTrace);
                 Console.ResetColor();
                 isStop = true;
@@ -253,7 +273,7 @@ namespace SqlRun
                         if (res != "y")
                             return;
                     }
-                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file,Encoding.UTF8));
+                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file, Encoding.UTF8));
                 }
                 else
                 {
@@ -264,11 +284,11 @@ namespace SqlRun
                     SqlProvider.ExecuteSqlCommand(File.ReadAllText(file, Encoding.UTF8));
                 }
             }
-            catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }
-            catch (SqlException ex) { throw new Exception($"SqlException:{ex.Message} {file} LineNumber:{ex.LineNumber}; StackTrace {ex.StackTrace}"); }
+            catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} ", ex); }
+            catch (SqlException ex) { throw new Exception($"SqlException:{ex.Message} {file} LineNumber:{ex.LineNumber}; StackTrace {ex.StackTrace}", ex); }
             catch (IOException ex) { throw new Exception($"IOException:{ex.Message} {file}; StackTrace {ex.StackTrace} "); }
-            catch (InvalidOperationException ex) { throw new Exception($"InvalidOperationException:{ex.Message} {file}; StackTrace {ex.StackTrace}"); }
-            catch (Exception ex) { throw new Exception($"Exception:{ex.Message} {file}; StackTrace {ex.StackTrace}"); }
+            catch (InvalidOperationException ex) { throw new Exception($"InvalidOperationException:{ex.Message} {file}; StackTrace {ex.StackTrace}", ex); }
+            catch (Exception ex) { throw new Exception($"Exception:{ex.Message} {file}; StackTrace {ex.StackTrace}", ex); }
             Console.ResetColor();
         }
     }

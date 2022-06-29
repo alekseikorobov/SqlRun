@@ -30,8 +30,14 @@ namespace SqlRun
 
         [Option('t', "test", Required = false, HelpText = "")]
         public bool IsTest { get; set; }
-        [Option('n', "notconnect", Required = false, HelpText = "")]
+        [Option('n', "notconnect", Required = false, HelpText = "not connect to server")]
         public bool IsNotConnect { get; internal set; }
+
+        [Option('T', "transaction", Required = false, HelpText = "Create transaction for one file but all sql batch")]
+        public bool IsTransaction { get; set; }
+
+        [Option('A', "alltransaction", Required = false, HelpText = "Create transaction for ALL files")]
+        public bool IsAllTransaction { get; set; }
 
         [HelpOption]
         public string GetUsage()
