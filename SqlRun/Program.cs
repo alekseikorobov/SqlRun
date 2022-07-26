@@ -24,13 +24,13 @@ namespace SqlRun
             args = new[]
             {
                 "-p",
-                @"c:\_work\Batman\Development\RM Additional Role Form\SQL"
+                @"c:\Temp\tempNGGC_User.sql"
                 //@"c:\Users\akorobov\Documents\sql scripts\"
                 //@"C:\Users\akorobov\Documents\sql scripts\Business.StrategyGroup_Opportunities.StoredProcedure.sql"
                 //"script.sql"
-                ,"--server", ""
-                ,"--db","KDB_BTMSOnlineDemo_test"
-                ,"-A"
+                ,"--server", "DEVDB01,1113"
+                ,"--db","KDB_Production"
+                //,"-A"
             };
 #endif
             bool IsDirectory = true;
@@ -281,7 +281,30 @@ namespace SqlRun
                     //{
                     //    isStop = true;
                     //}
-                    SqlProvider.ExecuteSqlCommand(File.ReadAllText(file, Encoding.UTF8));
+                    StringBuilder stringBuilder = new StringBuilder();
+                    using (StreamReader read = new StreamReader(file, Encoding.UTF8))
+                    {
+                        string line;
+                        bool isExecute = false;
+                        while ((line = read.ReadLine()) != null)
+                        {
+                            bool isGo = Regex.IsMatch(line, "^([\t ]+|)GO([\t ]+|[\t ]+--.*|--.*|)$", RegexOptions.IgnoreCase);
+                            if (isGo)
+                            {
+                                isExecute = true;
+                            }
+                            if (isExecute)
+                            {
+                                SqlProvider.ExecuteSqlCommand(stringBuilder.ToString());
+                                stringBuilder.Clear();
+                                isExecute = false;
+                            }
+                            else
+                            {
+                                stringBuilder.AppendLine(line);
+                            }
+                        }
+                    }
                 }
             }
             catch (InvalidCastException ex) { throw new Exception($"InvalidCastException:{ex.Message} {file}; StackTrace {ex.StackTrace} ", ex); }
